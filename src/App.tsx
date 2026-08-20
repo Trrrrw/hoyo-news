@@ -396,14 +396,14 @@ export default function App() {
               </p>
             </div>
           </div>
-          <Tooltip title="GitHub 仓库尚未上传，建议名称：hoyo-news">
-            <span className="inline-flex shrink-0">
-              <Button
-                disabled
-                icon={<GithubOutlined />}
-                aria-label="GitHub 仓库（尚未上传）"
-              />
-            </span>
+          <Tooltip title="GitHub 仓库">
+            <Button
+              href="https://github.com/Trrrrw/hoyo-news"
+              target="_blank"
+              rel="noreferrer"
+              icon={<GithubOutlined />}
+              aria-label="GitHub 仓库"
+            />
           </Tooltip>
         </div>
       </header>
