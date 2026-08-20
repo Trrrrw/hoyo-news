@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+:root {
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.site-footer a {
+  color: inherit !important;
+}
+
+/* 正文（原始 HTML）：保留内容中的原始换行（部分来源的 intro 是纯文本/混合文本，
+   HTML 默认会把换行折叠成空格） */
+.news-intro {
+  white-space: pre-wrap;
+}
+
+/* 部分正文用空的 <p> 表示空行，补出一行高度但不改变原始内容 */
+.news-intro p:empty::before {
+  content: "\00a0";
+}
+
+/* 正文（原始 HTML）内的图片限制宽度，避免溢出 Drawer */
+.news-intro img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  margin: 0.75rem 0;
+}
+
+/* 超窄屏隐藏分页中与顶部统计重复的总数，避免分页横向溢出 */
+@media (max-width: 360px) {
+  .mobile-pagination .ant-pagination-total-text {
+    display: none;
+  }
+}

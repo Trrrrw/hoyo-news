@@ -1,0 +1,172 @@
+import { useEffect, useState } from 'react'
+import { Button, Drawer, Spin, Tag } from 'antd'
+import { fetchNewsVideo } from '../api'
+import type { NewsItem } from '../api'
+import { formatDuration, formatPublishTime } from '../utils'
+
+interface NewsDrawerProps {
+  item: NewsItem | null
+  gameIcon: string | null
+  gameId: string | null
+  source: string
+  sourceName: string
+  onClose: () => void
+  onTagClick: (tag: string) => void
+}
+
+/**
+ * 抽屉内的视频播放器。
+ * 播放地址统一通过 /news/{id}/video 后端接口获取（官方站返回 CDN 地址，
+ * 米游社等返回临时签名地址）。
+ */
+function DrawerVideoPlayer({
+  item,
+  gameId,
+  source,
+}: {
+  item: NewsItem
+  gameId: string | null
+  source: string
+}) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
+
+  useEffect(() => {
+    if (!gameId) return
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    fetchNewsVideo(gameId, source, item.id)
+      .then(d => {
+        if (!cancelled) setUrl(d.video_url)
+      })
+      .catch(e => {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : '获取视频地址失败')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [item, gameId, source, attempt])
+
+  if (loading) {
+    return (
+      <div className="flex h-40 items-center justify-center rounded-lg bg-neutral-100">
+        <Spin tip="正在获取视频地址…" />
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+        <span>获取视频地址失败：{error}</span>
+        <Button size="small" onClick={() => setAttempt(a => a + 1)}>
+          重试
+        </Button>
+      </div>
+    )
+  }
+  if (!url) return null
+  return <video src={url} controls preload="metadata" className="w-full rounded-lg bg-black" />
+}
+
+export default function NewsDrawer({
+  item,
+  gameIcon,
+  gameId,
+  source,
+  sourceName,
+  onClose,
+  onTagClick,
+}: NewsDrawerProps) {
+  const coverSrc = item?.cover ?? gameIcon ?? null
+
+  // 正文中原样保留，但去掉内嵌 <video> 标签（其签名地址会过期）：
+  // 视频统一由上方播放器播放，地址来自 /news/{id}/video 后端接口。
+  const introHtml = item?.intro?.replace(/<video[\s\S]*?<\/video>/gi, '') ?? ''
+
+  return (
+    <Drawer
+      open={item != null}
+      onClose={onClose}
+      title={item?.title ?? ''}
+      size="min(760px, 92vw)"
+      destroyOnHidden
+      placement="right"
+    >
+      {item && (
+        <div className="flex flex-col gap-4">
+          {coverSrc && (
+            <img
+              src={coverSrc}
+              alt={item.title}
+              className="max-h-[45vh] w-full rounded-lg bg-neutral-100 object-contain"
+            />
+          )}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Tag color={item.news_type === 'video' ? 'purple' : 'blue'}>
+              {item.news_type === 'video'
+                ? `视频${item.video_duration != null ? ` · ${formatDuration(item.video_duration)}` : ''}`
+                : '文章'}
+            </Tag>
+            <span className="text-sm text-neutral-500">{sourceName}</span>
+            <span className="text-sm text-neutral-500">{formatPublishTime(item.publish_time)}</span>
+            <span className="text-sm text-neutral-500">ID：{item.id}</span>
+          </div>
+          {item.news_type === 'video' && (
+            <DrawerVideoPlayer item={item} gameId={gameId} source={source} />
+          )}
+          {item.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {item.tags.map(tag => (
+                <Tag
+                  key={tag}
+                  className="cursor-pointer"
+                  title="点击按此标签筛选"
+                  onClick={() => {
+                    onTagClick(tag)
+                    onClose()
+                  }}
+                >
+                  {tag}
+                </Tag>
+              ))}
+            </div>
+          )}
+          {item.characters.length > 0 && (
+            <div className="text-sm text-neutral-500">
+              关联角色：{item.characters.map(c => c.name).join(' / ')}
+            </div>
+          )}
+          <div>
+            {introHtml ? (
+              <div
+                className="news-intro text-sm leading-relaxed text-neutral-700"
+                dangerouslySetInnerHTML={{ __html: introHtml }}
+              />
+            ) : (
+              <p className="text-sm text-neutral-500">暂无正文简介</p>
+            )}
+          </div>
+          <div className="flex justify-end border-t border-neutral-200 pt-3">
+            <Button
+              variant="solid"
+              color="primary"
+              href={item.source_url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              查看原文
+            </Button>
+          </div>
+        </div>
+      )}
+    </Drawer>
+  )
+}
