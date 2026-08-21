@@ -57,14 +57,14 @@ function DrawerVideoPlayer({
 
   if (loading) {
     return (
-      <div className="flex h-40 items-center justify-center rounded-lg bg-neutral-100">
+      <div className="flex h-40 items-center justify-center rounded-lg bg-neutral-100 dark:bg-neutral-800">
         <Spin tip="正在获取视频地址…" />
       </div>
     )
   }
   if (error) {
     return (
-      <div className="flex items-center justify-between gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+      <div className="flex items-center justify-between gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-300">
         <span>获取视频地址失败：{error}</span>
         <Button size="small" onClick={() => setAttempt(a => a + 1)}>
           重试
@@ -99,15 +99,26 @@ export default function NewsDrawer({
       size="min(760px, 92vw)"
       destroyOnHidden
       placement="right"
+      extra={
+        item ? (
+          <Button
+            variant="solid"
+            color="primary"
+            href={item.source_url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            查看原文
+          </Button>
+        ) : null
+      }
     >
       {item && (
         <div className="flex flex-col gap-4">
           {coverSrc && (
-            <img
-              src={coverSrc}
-              alt={item.title}
-              className="max-h-[45vh] w-full rounded-lg bg-neutral-100 object-contain"
-            />
+            <div className="aspect-video w-full overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-800">
+              <img src={coverSrc} alt={item.title} className="h-full w-full object-cover" />
+            </div>
           )}
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <Tag color={item.news_type === 'video' ? 'purple' : 'blue'}>
@@ -115,9 +126,9 @@ export default function NewsDrawer({
                 ? `视频${item.video_duration != null ? ` · ${formatDuration(item.video_duration)}` : ''}`
                 : '文章'}
             </Tag>
-            <span className="text-sm text-neutral-500">{sourceName}</span>
-            <span className="text-sm text-neutral-500">{formatPublishTime(item.publish_time)}</span>
-            <span className="text-sm text-neutral-500">ID：{item.id}</span>
+            <span className="text-sm text-neutral-500 dark:text-neutral-400">{sourceName}</span>
+            <span className="text-sm text-neutral-500 dark:text-neutral-400">{formatPublishTime(item.publish_time)}</span>
+            <span className="text-sm text-neutral-500 dark:text-neutral-400">ID：{item.id}</span>
           </div>
           {item.news_type === 'video' && (
             <DrawerVideoPlayer item={item} gameId={gameId} source={source} />
@@ -140,30 +151,19 @@ export default function NewsDrawer({
             </div>
           )}
           {item.characters.length > 0 && (
-            <div className="text-sm text-neutral-500">
+            <div className="text-sm text-neutral-500 dark:text-neutral-400">
               关联角色：{item.characters.map(c => c.name).join(' / ')}
             </div>
           )}
-          <div>
+          <div className="border-t border-neutral-200 pt-4 dark:border-neutral-700">
             {introHtml ? (
               <div
-                className="news-intro text-sm leading-relaxed text-neutral-700"
+                className="news-intro text-sm leading-relaxed text-neutral-700 dark:text-neutral-300"
                 dangerouslySetInnerHTML={{ __html: introHtml }}
               />
             ) : (
-              <p className="text-sm text-neutral-500">暂无正文简介</p>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400">暂无正文简介</p>
             )}
-          </div>
-          <div className="flex justify-end border-t border-neutral-200 pt-3">
-            <Button
-              variant="solid"
-              color="primary"
-              href={item.source_url}
-              target="_blank"
-              rel="noreferrer"
-            >
-              查看原文
-            </Button>
           </div>
         </div>
       )}

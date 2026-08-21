@@ -1,13 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  DownOutlined,
-  GithubOutlined,
-  LoadingOutlined,
-  ReloadOutlined,
-  UpOutlined,
-  VerticalAlignTopOutlined,
-} from '@ant-design/icons'
-import { Alert, Button, Card, Empty, FloatButton, Form, Pagination, Select, Spin, Tooltip } from 'antd'
+  IconArrowUp,
+  IconBrandGithub,
+  IconChevronDown,
+  IconChevronUp,
+  IconLoader2,
+  IconMoon,
+  IconRefresh,
+  IconSun,
+  IconSunMoon,
+} from '@tabler/icons-react'
+import {
+  Alert,
+  Button,
+  Card,
+  Empty,
+  FloatButton,
+  Form,
+  Input,
+  Pagination,
+  Select,
+  Spin,
+  Tooltip,
+} from 'antd'
 import {
   BASE_URL,
   fetchGameCharacters,
@@ -26,6 +41,7 @@ import NewsItemRow from './components/NewsItemRow'
 import { useCopyText } from './hooks/useCopyText'
 import { readNewsRoute, writeNewsRoute } from './newsRoute'
 import type { NewsRouteState } from './newsRoute'
+import { useThemeMode } from './theme/ThemeContext'
 
 function isAbortError(e: unknown): boolean {
   return e instanceof DOMException && e.name === 'AbortError'
@@ -36,10 +52,35 @@ function toMessage(e: unknown): string {
   return '请求失败，请稍后重试'
 }
 
+function ThemeToggle() {
+  const { mode, cycleTheme } = useThemeMode()
+
+  const config = {
+    light: { icon: <IconSun size={18} />, title: '浅色模式' },
+    dark: { icon: <IconMoon size={18} />, title: '深色模式' },
+    system: { icon: <IconSunMoon size={18} />, title: '跟随系统' },
+  }[mode]
+
+  return (
+    <Tooltip placement="bottom" title={config.title}>
+      <Button
+        type="text"
+        shape="circle"
+        icon={config.icon}
+        aria-label={`当前：${config.title}；点击切换主题`}
+        onClick={cycleTheme}
+      />
+    </Tooltip>
+  )
+}
+
 export default function App() {
   const [filterForm] = Form.useForm<FilterValues>()
   const copyText = useCopyText()
   const [initialRoute] = useState<NewsRouteState>(() => readNewsRoute())
+  const [keyword, setKeyword] = useState(() => initialRoute.values.q ?? '')
+  const keywordRef = useRef(keyword)
+  const filterFormRef = useRef(filterForm)
   const routeUserInteracted = useRef(false)
   const paginationRef = useRef<HTMLDivElement>(null)
 
@@ -72,6 +113,14 @@ export default function App() {
 
   const reqSeq = useRef(0)
 
+  const getCurrentFilterValues = useCallback(
+    () => ({
+      ...filterFormRef.current.getFieldsValue(),
+      q: keywordRef.current.trim() || undefined,
+    }),
+    [],
+  )
+
   useEffect(() => {
     const input = paginationRef.current?.querySelector<HTMLInputElement>(
       '.ant-pagination-options-quick-jumper input',
@@ -94,7 +143,7 @@ export default function App() {
         reverse: false,
         untagged: false,
         characters: undefined,
-        ...(opts.values ?? filterForm.getFieldsValue()),
+        ...(opts.values ?? getCurrentFilterValues()),
       }
       const requestValues: FilterValues = {
         ...values,
@@ -140,7 +189,7 @@ export default function App() {
         if (seq === reqSeq.current) setLoadingNews(false)
       }
     },
-    [filterForm],
+    [getCurrentFilterValues],
   )
 
   // 加载游戏列表（仅一次）
@@ -266,14 +315,37 @@ export default function App() {
 
   const handleQuery = (values: FilterValues) => {
     if (gameId && sourceId) {
-      refreshNews({ gameId, sourceId, page: 1, values: { ...values, limit: pageSize } })
+      refreshNews({
+        gameId,
+        sourceId,
+        page: 1,
+        values: { ...values, q: keywordRef.current.trim() || undefined, limit: pageSize },
+      })
+    }
+  }
+
+  const handleKeywordChange = (value: string) => {
+    keywordRef.current = value
+    setKeyword(value)
+  }
+
+  const handleKeywordSearch = (value: string) => {
+    handleKeywordChange(value)
+    if (gameId && sourceId) {
+      refreshNews({
+        gameId,
+        sourceId,
+        page: 1,
+        values: { ...getCurrentFilterValues(), q: value.trim() || undefined, limit: pageSize },
+      })
     }
   }
 
   const handleReset = () => {
     filterForm.resetFields()
+    handleKeywordChange('')
     if (gameId && sourceId) {
-      refreshNews({ gameId, sourceId, page: 1, values: { limit: pageSize } })
+      refreshNews({ gameId, sourceId, page: 1, values: { limit: pageSize, q: undefined } })
     }
   }
 
@@ -286,7 +358,7 @@ export default function App() {
         gameId,
         sourceId,
         page: 1,
-        values: { ...filterForm.getFieldsValue(), limit: pageSize, tags: [...current, tag] },
+        values: { ...getCurrentFilterValues(), limit: pageSize, tags: [...current, tag] },
       })
     }
   }
@@ -297,7 +369,7 @@ export default function App() {
         gameId,
         sourceId,
         page: p,
-        values: { ...filterForm.getFieldsValue(), limit: size },
+        values: { ...getCurrentFilterValues(), limit: size },
       })
     }
   }
@@ -314,7 +386,7 @@ export default function App() {
           gameId,
           sourceId,
           page,
-          values: { ...filterForm.getFieldsValue(), limit: pageSize },
+          values: { ...getCurrentFilterValues(), limit: pageSize },
         }),
         shouldRefreshTags ? fetchNewsTags(gameId, sourceId) : Promise.resolve(null),
         fetchNewsTotal(gameId, sourceId),
@@ -331,7 +403,7 @@ export default function App() {
   const handleCopyRss = () => {
     if (!gameId || !sourceId) return
 
-    const values = filterForm.getFieldsValue()
+    const values = getCurrentFilterValues()
     const params = new URLSearchParams()
     params.set('source', sourceId)
     params.set('limit', String(pageSize))
@@ -372,20 +444,23 @@ export default function App() {
   }))
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900">
-      <header className="border-b border-neutral-200 bg-white">
+    <div className="min-h-screen bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+      <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4">
           <div className="flex min-w-0 items-center gap-3">
-            {game?.icon ? (
-              <img src={game.icon} alt={game.name} className="h-10 w-10 shrink-0 rounded-lg" />
-            ) : (
-              <div className="h-10 w-10 shrink-0 rounded-lg bg-neutral-200" />
-            )}
+            <a href="/" aria-label="蒸汽鸟报首页" className="shrink-0">
+              <img
+                src="/steambird-mark.png"
+                alt="蒸汽鸟报"
+                draggable={false}
+                className="h-10 w-10 select-none rounded-lg"
+              />
+            </a>
             <div className="min-w-0">
               <h1 className="text-lg font-bold leading-tight">
                 蒸汽鸟报
               </h1>
-              <p className="truncate text-sm text-neutral-500">
+              <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">
                 {loadingGames
                   ? '正在加载游戏列表…'
                   : game
@@ -396,37 +471,51 @@ export default function App() {
               </p>
             </div>
           </div>
-          <Tooltip title="GitHub 仓库">
-            <Button
-              href="https://github.com/Trrrrw/hoyo-news"
-              target="_blank"
-              rel="noreferrer"
-              icon={<GithubOutlined />}
-              aria-label="GitHub 仓库"
-            />
-          </Tooltip>
+          <div className="flex shrink-0 items-center gap-1">
+            <ThemeToggle />
+            <Tooltip title="GitHub 仓库">
+              <Button
+                type="text"
+                shape="circle"
+                href="https://github.com/Trrrrw/hoyo-news"
+                target="_blank"
+                rel="noreferrer"
+                icon={<IconBrandGithub size={18} />}
+                aria-label="GitHub 仓库"
+              />
+            </Tooltip>
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-5">
         <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <div className="mb-1 text-sm text-neutral-600">
+            <div className="mb-1 text-sm text-neutral-600 dark:text-neutral-300">
               游戏 <span className="text-red-500">*</span>
             </div>
-            <Select
-              className="w-full"
-              placeholder="选择游戏"
-              value={gameId ?? undefined}
-              onChange={handleGameChange}
-              loading={loadingGames}
-              showSearch
-              optionFilterProp="label"
-              options={games.map(g => ({ label: g.name, value: g.id }))}
-            />
+            <div className="flex items-center gap-2">
+              {game?.icon && (
+                <img
+                  src={game.icon}
+                  alt={game.name}
+                  className="h-8 w-8 shrink-0 rounded-md object-cover"
+                />
+              )}
+              <Select
+                className="min-w-0 flex-1"
+                placeholder="选择游戏"
+                value={gameId ?? undefined}
+                onChange={handleGameChange}
+                loading={loadingGames}
+                showSearch
+                optionFilterProp="label"
+                options={games.map(g => ({ label: g.name, value: g.id }))}
+              />
+            </div>
           </div>
           <div>
-            <div className="mb-1 text-sm text-neutral-600">
+            <div className="mb-1 text-sm text-neutral-600 dark:text-neutral-300">
               新闻来源 <span className="text-red-500">*</span>
             </div>
             <Select
@@ -441,6 +530,23 @@ export default function App() {
           </div>
         </div>
 
+        <div className="mb-3">
+          <Input.Search
+            allowClear
+            value={keyword}
+            placeholder="搜索新闻标题"
+            enterButton="搜索"
+            loading={loadingNews}
+            onChange={event => handleKeywordChange(event.target.value)}
+            onSearch={handleKeywordSearch}
+            aria-label="搜索新闻标题"
+          />
+          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+            搜索语法：空格表示 AND，<code>|</code> 表示 OR，<code>-</code> 排除关键词，
+            <code>"..."</code> 匹配短语
+          </p>
+        </div>
+
         <Card
           title={
             <button
@@ -451,23 +557,37 @@ export default function App() {
               onClick={() => setFilterCollapsed(collapsed => !collapsed)}
             >
               <span>筛选条件</span>
-              {filterCollapsed ? <DownOutlined aria-hidden /> : <UpOutlined aria-hidden />}
+              {filterCollapsed ? (
+                <IconChevronDown size={16} aria-hidden />
+              ) : (
+                <IconChevronUp size={16} aria-hidden />
+              )}
             </button>
           }
-          styles={{ body: filterCollapsed ? { display: 'none' } : undefined }}
+          styles={{ body: { padding: 0 } }}
         >
-          <div id="news-filter-panel">
-          <FilterPanel
-            form={filterForm}
-            tagOptions={tagOptions}
-            characterOptions={characterOptions}
-            loadingTags={loadingTags}
-            loadingCharacters={loadingCharacters}
-            queryLoading={loadingNews}
-            onQuery={handleQuery}
-            onReset={handleReset}
-            onRss={handleCopyRss}
-          />
+          <div
+            aria-hidden={filterCollapsed}
+            inert={filterCollapsed}
+            className={`grid motion-reduce:transition-none transition-[grid-template-rows] duration-200 ease-in-out ${
+              filterCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'
+            }`}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <div id="news-filter-panel" className="px-6 py-6">
+                <FilterPanel
+                  form={filterForm}
+                  tagOptions={tagOptions}
+                  characterOptions={characterOptions}
+                  loadingTags={loadingTags}
+                  loadingCharacters={loadingCharacters}
+                  queryLoading={loadingNews}
+                  onQuery={handleQuery}
+                  onReset={handleReset}
+                  onRss={handleCopyRss}
+                />
+              </div>
+            </div>
           </div>
         </Card>
 
@@ -475,7 +595,7 @@ export default function App() {
 
         <Spin spinning={loadingNews}>
           {news.length > 0 ? (
-            <div className="mt-2 divide-y divide-neutral-200">
+            <div className="mt-2 divide-y divide-neutral-200 dark:divide-neutral-800">
               {news.map(item => (
                 <NewsItemRow
                   key={item.id}
@@ -518,14 +638,20 @@ export default function App() {
           style={{ position: 'fixed', right: 24, bottom: 24, zIndex: 50 }}
         >
           <FloatButton
-            icon={loadingNews || loadingTags ? <LoadingOutlined spin /> : <ReloadOutlined />}
+            icon={
+              loadingNews || loadingTags ? (
+                <IconLoader2 size={16} className="animate-spin" />
+              ) : (
+                <IconRefresh size={16} />
+              )
+            }
             aria-label="刷新数据"
             tooltip="刷新数据"
             disabled={loadingNews || loadingTags}
             onClick={handleRefresh}
           />
           <FloatButton.BackTop
-            icon={<VerticalAlignTopOutlined />}
+            icon={<IconArrowUp size={16} />}
             aria-label="回到顶部"
             tooltip="回到顶部"
             visibilityHeight={200}
@@ -543,8 +669,8 @@ export default function App() {
         onTagClick={handleTagSelect}
       />
 
-      <footer className="site-footer mt-8 border-t border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 py-4 text-xs text-neutral-500">
+      <footer className="site-footer mt-8 border-t border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 py-4 text-xs text-neutral-500 dark:text-neutral-400">
           <span>
             数据来自{' '}
             <a

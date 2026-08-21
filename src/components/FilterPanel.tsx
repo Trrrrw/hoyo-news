@@ -1,4 +1,4 @@
-import { Button, DatePicker, Form, Input, Segmented, Select, Switch } from 'antd'
+import { Button, DatePicker, Form, Segmented, Select, Switch } from 'antd'
 import type { FormInstance } from 'antd'
 import type { Dayjs } from 'dayjs'
 
@@ -69,7 +69,7 @@ interface FilterPanelProps {
 
 /**
  * 可选筛选面板（对应 /news 接口的可选参数）:
- * q（标题查询）、tag（标签/未分类）、character（角色）、news_type、
+ * tag（标签/未分类）、character（角色）、news_type、
  * published_from/published_to（日期范围）、limit、order（时间顺序）
  */
 export default function FilterPanel({
@@ -91,14 +91,8 @@ export default function FilterPanel({
       onFinish={onQuery}
     >
       <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Form.Item name="q" label="关键词 (q)" className="sm:col-span-2">
-          <Input
-            allowClear
-            placeholder="标题查询：空格 AND、| OR、- 排除、引号短语"
-          />
-        </Form.Item>
         <div>
-          <div className="mb-2 text-sm leading-6 text-neutral-700">
+          <div className="mb-2 text-sm leading-6 text-neutral-700 dark:text-neutral-300">
             <span id="news_type_label">新闻类型</span>
           </div>
           <Form.Item name="news_type" noStyle>
@@ -119,7 +113,7 @@ export default function FilterPanel({
             id={{ start: 'during', end: 'during_end' }}
           />
         </Form.Item>
-        <Form.Item name="tags" label="标签 (tags)" className="sm:col-span-2">
+        <Form.Item name="tags" label="标签" className="sm:col-span-2">
           <Select
             mode="multiple"
             allowClear
@@ -130,7 +124,7 @@ export default function FilterPanel({
             loading={loadingTags}
           />
         </Form.Item>
-        <Form.Item name="characters" label="角色 (character)" className="sm:col-span-2">
+        <Form.Item name="characters" label="角色" className="sm:col-span-2">
           <Select
             mode="multiple"
             allowClear
@@ -144,7 +138,7 @@ export default function FilterPanel({
         </Form.Item>
         <Form.Item
           name="reverse"
-          label="时间顺序 (order)"
+          label="时间顺序"
           valuePropName="checked"
           className="mb-0"
         >
