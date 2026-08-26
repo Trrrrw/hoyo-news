@@ -184,7 +184,7 @@ export function fetchNewsVideo(
   signal?: AbortSignal,
 ) {
   return request<{ video_url: string }>(
-    `/api/v1/games/${encodeURIComponent(gameId)}/news/${encodeURIComponent(newsId)}/video?source=${encodeURIComponent(source)}`,
+    `/api/v1/games/${encodeURIComponent(gameId)}/news/${encodeURIComponent(newsId)}/media/video?source=${encodeURIComponent(source)}`,
     signal,
   )
 }

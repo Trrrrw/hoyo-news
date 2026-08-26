@@ -16,7 +16,7 @@ interface NewsDrawerProps {
 
 /**
  * 抽屉内的视频播放器。
- * 播放地址统一通过 /news/{id}/video 后端接口获取（官方站返回 CDN 地址，
+ * 播放地址统一通过 /news/{id}/media/video 后端接口获取（官方站返回 CDN 地址，
  * 米游社等返回临时签名地址）。
  */
 function DrawerVideoPlayer({
@@ -88,7 +88,7 @@ export default function NewsDrawer({
   const coverSrc = item?.cover ?? gameIcon ?? null
 
   // 正文中原样保留，但去掉内嵌 <video> 标签（其签名地址会过期）：
-  // 视频统一由上方播放器播放，地址来自 /news/{id}/video 后端接口。
+  // 视频统一由上方播放器播放，地址来自 /news/{id}/media/video 后端接口。
   const introHtml = item?.intro?.replace(/<video[\s\S]*?<\/video>/gi, '') ?? ''
 
   return (
