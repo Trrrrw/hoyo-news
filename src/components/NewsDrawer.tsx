@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Button, Drawer, Spin, Tag } from 'antd'
 import { fetchNewsVideo } from '../api'
-import type { NewsItem } from '../api'
+import type { NewsItem, VideoPlayback } from '../api'
+import { DirectVideoPlayer, YouTubeVideoPlayer } from './VideoPlayer'
 import { formatDuration, formatPublishTime } from '../utils'
 
 interface NewsDrawerProps {
@@ -16,8 +17,7 @@ interface NewsDrawerProps {
 
 /**
  * 抽屉内的视频播放器。
- * 播放地址统一通过 /news/{id}/media/video 后端接口获取（官方站返回 CDN 地址，
- * 米游社等返回临时签名地址）。
+ * 播放地址统一通过 /news/{id}/media/video 后端接口获取
  */
 function DrawerVideoPlayer({
   item,
@@ -28,7 +28,7 @@ function DrawerVideoPlayer({
   gameId: string | null
   source: string
 }) {
-  const [url, setUrl] = useState<string | null>(null)
+  const [video, setVideo] = useState<{ url: string; playback: VideoPlayback } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -38,9 +38,15 @@ function DrawerVideoPlayer({
     let cancelled = false
     setLoading(true)
     setError(null)
+    setVideo(null)
     fetchNewsVideo(gameId, source, item.id)
       .then(d => {
-        if (!cancelled) setUrl(d.video_url)
+        if (!cancelled) {
+          setVideo({
+            url: d.video_url,
+            playback: d.video_playback ?? item.video_playback ?? 'direct',
+          })
+        }
       })
       .catch(e => {
         if (!cancelled) {
@@ -53,7 +59,7 @@ function DrawerVideoPlayer({
     return () => {
       cancelled = true
     }
-  }, [item, gameId, source, attempt])
+  }, [item.id, item.video_playback, gameId, source, attempt])
 
   if (loading) {
     return (
@@ -72,8 +78,12 @@ function DrawerVideoPlayer({
       </div>
     )
   }
-  if (!url) return null
-  return <video src={url} controls preload="metadata" className="w-full rounded-lg bg-black" />
+  if (!video) return null
+  return video.playback === 'embed' ? (
+    <YouTubeVideoPlayer src={video.url} title={item.title} />
+  ) : (
+    <DirectVideoPlayer src={video.url} />
+  )
 }
 
 export default function NewsDrawer({

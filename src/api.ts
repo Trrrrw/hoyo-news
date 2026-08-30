@@ -11,6 +11,8 @@ export interface NewsCharacter {
   name: string
 }
 
+export type VideoPlayback = 'direct' | 'embed'
+
 export interface NewsItem {
   id: string
   source: string
@@ -23,6 +25,7 @@ export interface NewsItem {
   tags: string[]
   characters: NewsCharacter[]
   video_url: string | null
+  video_playback: VideoPlayback | null
   video_duration: number | null
 }
 
@@ -176,14 +179,14 @@ export function fetchNewsTotal(gameId: string, sourceId: string, signal?: AbortS
   )
 }
 
-/** 获取新闻视频播放地址（米游社等来源需要通过该接口获取有效地址） */
+/** 获取新闻视频播放信息（米游社等来源需要通过该接口获取有效地址） */
 export function fetchNewsVideo(
   gameId: string,
   source: string,
   newsId: string,
   signal?: AbortSignal,
 ) {
-  return request<{ video_url: string }>(
+  return request<{ video_url: string; video_playback?: VideoPlayback | null }>(
     `/api/v1/games/${encodeURIComponent(gameId)}/news/${encodeURIComponent(newsId)}/media/video?source=${encodeURIComponent(source)}`,
     signal,
   )
