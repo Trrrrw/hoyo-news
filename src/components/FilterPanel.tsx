@@ -1,23 +1,9 @@
-import { Button, DatePicker, Form, Segmented, Select, Switch } from 'antd'
+import { useState } from 'react'
+import { Button, DatePicker, Form, Input, Spin } from 'antd'
 import type { FormInstance } from 'antd'
 import type { Dayjs } from 'dayjs'
 
 const { RangePicker } = DatePicker
-
-function RssIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true">
-      <circle cx="5" cy="19" r="1.8" fill="currentColor" />
-      <path
-        d="M5 11a8 8 0 0 1 8 8M5 5a14 14 0 0 1 14 14"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
 
 export interface FilterValues {
   q?: string
@@ -55,16 +41,64 @@ export interface TagOptionGroup {
 
 export type TagOptionItem = TagOption | TagOptionGroup
 
+interface OptionButtonsProps {
+  value?: string[]
+  onChange?: (value: string[]) => void
+  options: TagOptionItem[]
+  loading: boolean
+  kind: string
+  id?: string
+}
+
+function OptionButtons({ value = [], onChange, options, loading, kind, id }: OptionButtonsProps) {
+  const [search, setSearch] = useState('')
+  const groups: TagOptionGroup[] = options.filter((option): option is TagOptionGroup => 'options' in option)
+  const ungrouped = options.filter((option): option is TagOption => !('options' in option))
+  if (ungrouped.length) groups.push({ label: '', options: ungrouped })
+  const allOptions = groups.flatMap(group => group.options)
+  const query = search.trim().toLocaleLowerCase()
+  const matches = allOptions.filter(option => option.label.toLocaleLowerCase().includes(query))
+  const visible = new Set(matches.map(option => option.value))
+  // 已选项始终可见，便于直接取消
+  for (const selected of value) visible.add(selected)
+  const toggle = (key: string) => onChange?.(value.includes(key) ? value.filter(item => item !== key) : [...value, key])
+
+  return (
+    <div id={id} className="option-picker" role="group" aria-label={`${kind}多选`}>
+      <div className="option-picker-tools">
+        <span>共 {allOptions.length} 项 · 已选 {value.length} 项 · 多选时匹配任一项</span>
+        {value.length > 0 && <Button size="small" type="link" onClick={() => onChange?.([])}>清除{kind}</Button>}
+        {allOptions.length > 12 && <Input.Search allowClear value={search} onChange={event => setSearch(event.target.value)} placeholder={`查找${kind}`} aria-label={`查找${kind}`} className="option-search" />}
+      </div>
+      {loading ? <div className="py-3"><Spin size="small" /> <span>正在加载{kind}…</span></div> : <>
+        {groups.map((group, index) => {
+          const items = group.options.filter(option => visible.has(option.value))
+          if (!items.length) return null
+          return <div className="option-group" key={`${group.label}:${index}`}>
+            {group.label && <div className="option-group-label">{group.label}</div>}
+            <div className="option-buttons">{items.map(option => <Button
+              key={option.value}
+              type={value.includes(option.value) ? 'primary' : 'default'}
+              aria-pressed={value.includes(option.value)}
+              onClick={() => toggle(option.value)}
+            >{value.includes(option.value) && <span aria-hidden="true">✓ </span>}{option.label}</Button>)}</div>
+          </div>
+        })}
+        {value.filter(key => !allOptions.some(option => option.value === key)).map(key => <Button key={key} type="primary" aria-pressed onClick={() => toggle(key)}>✓ {key}</Button>)}
+        {allOptions.length === 0 && <p className="option-empty">暂无可选{kind}</p>}
+        {query && matches.length === 0 && <p className="option-empty">没有匹配的{kind}{value.length > 0 ? '，已选项仍保留显示' : ''}</p>}
+      </>}
+    </div>
+  )
+}
+
 interface FilterPanelProps {
   form: FormInstance<FilterValues>
   tagOptions: TagOptionItem[]
   characterOptions: { label: string; value: string }[]
   loadingTags: boolean
   loadingCharacters: boolean
-  queryLoading: boolean
   onQuery: (values: FilterValues) => void
-  onReset: () => void
-  onRss: () => void
 }
 
 /**
@@ -78,10 +112,7 @@ export default function FilterPanel({
   characterOptions,
   loadingTags,
   loadingCharacters,
-  queryLoading,
   onQuery,
-  onReset,
-  onRss,
 }: FilterPanelProps) {
   return (
     <Form<FilterValues>
@@ -89,74 +120,21 @@ export default function FilterPanel({
       layout="vertical"
       initialValues={DEFAULT_FILTER_VALUES}
       onFinish={onQuery}
+      onValuesChange={(_, values) => onQuery({ ...form.getFieldsValue(true), ...values })}
     >
-      <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div>
-          <div className="mb-2 text-sm leading-6 text-neutral-700 dark:text-neutral-300">
-            <span id="news_type_label">新闻类型</span>
-          </div>
-          <Form.Item name="news_type" noStyle>
-            <Segmented
-              aria-labelledby="news_type_label"
-              block
-              options={[
-                { label: '全部', value: 'all' },
-                { label: '文章', value: 'article' },
-                { label: '视频', value: 'video' },
-              ]}
-            />
-          </Form.Item>
-        </div>
-        <Form.Item name="during" label="发布日期范围">
+      <div className="filter-fields">
+        <Form.Item name="during" label="发布日期范围" className="filter-date">
           <RangePicker
             className="w-full"
             id={{ start: 'during', end: 'during_end' }}
           />
         </Form.Item>
-        <Form.Item name="tags" label="标签" className="sm:col-span-2">
-          <Select
-            mode="multiple"
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            placeholder="选择标签，可多选（任一匹配即可）"
-            options={tagOptions}
-            loading={loadingTags}
-          />
+        <Form.Item name="tags" label="标签">
+          <OptionButtons options={tagOptions} loading={loadingTags} kind="标签" />
         </Form.Item>
-        <Form.Item name="characters" label="角色" className="sm:col-span-2">
-          <Select
-            mode="multiple"
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            placeholder="选择角色，可多选（任一匹配即可）"
-            options={characterOptions}
-            loading={loadingCharacters}
-            notFoundContent={loadingCharacters ? '正在加载角色…' : '暂无角色数据'}
-          />
+        <Form.Item name="characters" label="角色">
+          <OptionButtons options={characterOptions} loading={loadingCharacters} kind="角色" />
         </Form.Item>
-        <Form.Item
-          name="reverse"
-          label="时间顺序"
-          valuePropName="checked"
-          className="mb-0"
-        >
-          <Switch checkedChildren="升序" unCheckedChildren="降序" />
-        </Form.Item>
-      </div>
-      <div className="mt-2 flex items-center justify-end gap-2">
-        <Button onClick={onReset}>重置</Button>
-        <Button variant="solid" color="primary" htmlType="submit" loading={queryLoading}>
-          查询
-        </Button>
-        <Button
-          shape="circle"
-          icon={<RssIcon />}
-          aria-label="复制 RSS 链接"
-          title="复制 RSS 链接"
-          onClick={onRss}
-        />
       </div>
     </Form>
   )

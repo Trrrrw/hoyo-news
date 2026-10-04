@@ -1,9 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Button, Drawer, Spin, Tag } from 'antd'
 import { fetchNewsVideo } from '../api'
 import type { NewsItem, VideoPlayback } from '../api'
 import { DirectVideoPlayer, YouTubeVideoPlayer } from './VideoPlayer'
 import { formatDuration, formatPublishTime } from '../utils'
+import { useCopyText } from '../hooks/useCopyText'
+
+function ReaderTag({ children, color, onClick }: { children: string; color?: string; onClick: () => void }) {
+  return <Tag color={color} role="button" tabIndex={0} onClick={onClick} onKeyDown={event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onClick()
+    }
+  }}>{children}</Tag>
+}
 
 interface NewsDrawerProps {
   item: NewsItem | null
@@ -13,6 +23,10 @@ interface NewsDrawerProps {
   sourceName: string
   onClose: () => void
   onTagClick: (tag: string) => void
+  onCharacterClick: (id: string, name: string) => void
+  previous?: NewsItem
+  next?: NewsItem
+  onNavigate: (item: NewsItem) => void
 }
 
 /**
@@ -94,89 +108,62 @@ export default function NewsDrawer({
   sourceName,
   onClose,
   onTagClick,
+  onCharacterClick,
+  previous,
+  next,
+  onNavigate,
 }: NewsDrawerProps) {
-  const coverSrc = item?.cover ?? gameIcon ?? null
-
-  // 正文中原样保留，但去掉内嵌 <video> 标签（其签名地址会过期）：
-  // 视频统一由上方播放器播放，地址来自 /news/{id}/media/video 后端接口。
+  const copyText = useCopyText()
+  const resetScroll = useCallback((element: HTMLElement | null) => {
+    if (element) element.closest('.ant-drawer-body')?.scrollTo({ top: 0 })
+  }, [])
+  // 视频地址单独获取，避免使用正文内过期的签名
   const introHtml = item?.intro?.replace(/<video[\s\S]*?<\/video>/gi, '') ?? ''
+  const showCover = item?.cover && item.news_type !== 'video' && !/<img\b/i.test(introHtml)
 
   return (
     <Drawer
       open={item != null}
       onClose={onClose}
-      title={item?.title ?? ''}
-      size="min(760px, 92vw)"
+      title="新闻详情"
+      size="min(820px, 100vw)"
+      rootClassName="news-reader"
       destroyOnHidden
       placement="right"
-      extra={
-        item ? (
-          <Button
-            variant="solid"
-            color="primary"
-            href={item.source_url}
-            target="_blank"
-            rel="noreferrer"
-          >
-            查看原文
-          </Button>
-        ) : null
-      }
+      extra={item && <div className="flex items-center gap-1">
+        <Button type="text" size="small" onClick={() => void copyText(item.source_url, '原文链接已复制')}>复制链接</Button>
+        <Button href={item.source_url} target="_blank" rel="noreferrer">查看原文 ↗</Button>
+      </div>}
+      footer={item && <div className="reader-navigation">
+        <Button disabled={!previous} onClick={() => previous && onNavigate(previous)} title={previous?.title}>← 上一篇</Button>
+        <span>当前列表内切换</span>
+        <Button disabled={!next} onClick={() => next && onNavigate(next)} title={next?.title}>下一篇 →</Button>
+      </div>}
     >
-      {item && (
-        <div className="flex flex-col gap-4">
-          {coverSrc && (
-            <div className="aspect-video w-full overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-800">
-              <img src={coverSrc} alt={item.title} className="h-full w-full object-cover" />
-            </div>
-          )}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <Tag color={item.news_type === 'video' ? 'purple' : 'blue'}>
-              {item.news_type === 'video'
-                ? `视频${item.video_duration != null ? ` · ${formatDuration(item.video_duration)}` : ''}`
-                : '文章'}
-            </Tag>
-            <span className="text-sm text-neutral-500 dark:text-neutral-400">{sourceName}</span>
-            <span className="text-sm text-neutral-500 dark:text-neutral-400">{formatPublishTime(item.publish_time)}</span>
-            <span className="text-sm text-neutral-500 dark:text-neutral-400">ID：{item.id}</span>
-          </div>
-          {item.news_type === 'video' && (
-            <DrawerVideoPlayer item={item} gameId={gameId} source={source} />
-          )}
-          {item.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {item.tags.map(tag => (
-                <Tag
-                  key={tag}
-                  className="cursor-pointer"
-                  title="点击按此标签筛选"
-                  onClick={() => {
-                    onTagClick(tag)
-                    onClose()
-                  }}
-                >
-                  {tag}
-                </Tag>
-              ))}
-            </div>
-          )}
-          {item.characters.length > 0 && (
-            <div className="text-sm text-neutral-500 dark:text-neutral-400">
-              关联角色：{item.characters.map(c => c.name).join(' / ')}
-            </div>
-          )}
-          <div className="border-t border-neutral-200 pt-4 dark:border-neutral-700">
-            {introHtml ? (
-              <div
-                className="news-intro text-sm leading-relaxed text-neutral-700 dark:text-neutral-300"
-                dangerouslySetInnerHTML={{ __html: introHtml }}
-              />
-            ) : (
-              <p className="text-sm text-neutral-500 dark:text-neutral-400">暂无正文简介</p>
-            )}
-          </div>
+      {item && <article key={`${source}:${item.id}`} className="reader-article" ref={resetScroll}>
+        <div className="reader-meta">
+          {gameIcon && <img src={gameIcon} alt="" className="reader-game-icon" />}
+          <span>{sourceName}</span>
+          <span>{formatPublishTime(item.publish_time)}</span>
+          <Tag color={item.news_type === 'video' ? 'purple' : 'blue'}>
+            {item.news_type === 'video' ? `视频${item.video_duration != null ? ` · ${formatDuration(item.video_duration)}` : ''}` : '文章'}
+          </Tag>
         </div>
-      )}
+        <h1 className="reader-title">{item.title}</h1>
+        {showCover && <img src={item.cover!} alt="" className="reader-cover" />}
+        {item.news_type === 'video' && <DrawerVideoPlayer item={item} gameId={gameId} source={source} />}
+        {introHtml.trim() ? <div className="news-intro reader-content" dangerouslySetInnerHTML={{ __html: introHtml }} /> :
+          <div className="reader-empty">{item.news_type === 'video' ? '暂无文字介绍' : '暂无正文内容，可通过右上角查看原文'}</div>}
+        {(item.tags.length > 0 || item.characters.length > 0) && <section className="reader-related" aria-label="关联信息">
+          {item.tags.length > 0 && <div className="reader-tags" aria-label="标签">
+            {item.tags.map(tag => <ReaderTag key={tag} onClick={() => { onTagClick(tag); onClose() }}>{tag}</ReaderTag>)}
+          </div>}
+          {item.characters.length > 0 && <div className="reader-tags" aria-label="关联角色">
+            {item.characters.map(character => <ReaderTag key={character.id} color="blue" onClick={() => { onCharacterClick(character.id, character.name); onClose() }}>{character.name}</ReaderTag>)}
+          </div>}
+        </section>}
+        <div className="reader-id">新闻 ID：{item.id}</div>
+      </article>}
     </Drawer>
   )
 }

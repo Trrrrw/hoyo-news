@@ -55,6 +55,10 @@ export default function ThemeProvider({ children }: { children: ReactNode }) {
           algorithm:
             resolvedTheme === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
           token: {
+            colorPrimary: '#347b98',
+            borderRadius: 10,
+            controlHeight: 38,
+            fontFamily: 'system-ui, -apple-system, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif',
             colorTextSecondary: resolvedTheme === 'dark' ? '#bfbfbf' : '#595959',
           },
         }}

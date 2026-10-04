@@ -16,7 +16,7 @@ export default function NewsItemRow({ item, gameIcon, sourceName, onOpen, onTagC
 
   return (
     <article
-      className="flex cursor-pointer flex-col gap-3 py-4 transition-colors hover:bg-neutral-100/70 dark:hover:bg-neutral-800/70 sm:flex-row sm:gap-4"
+      className="news-row"
       onClick={() => onOpen(item)}
     >
       {coverSrc ? (
@@ -24,7 +24,7 @@ export default function NewsItemRow({ item, gameIcon, sourceName, onOpen, onTagC
           src={coverSrc}
           alt={item.title}
           loading="lazy"
-          className="aspect-video h-auto w-full shrink-0 rounded-lg object-cover sm:aspect-auto sm:h-28 sm:w-44"
+          className="news-cover"
         />
       ) : (
         <div className="flex aspect-video h-auto w-full shrink-0 items-center justify-center rounded-lg bg-neutral-200 text-xs text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400 sm:aspect-auto sm:h-28 sm:w-44">
@@ -41,13 +41,22 @@ export default function NewsItemRow({ item, gameIcon, sourceName, onOpen, onTagC
           <span className="text-xs text-neutral-400 dark:text-neutral-500">{sourceName}</span>
           <span className="text-xs text-neutral-400 dark:text-neutral-500">{formatPublishTime(item.publish_time)}</span>
         </div>
-        <div className="text-base font-semibold">{item.title}</div>
+        <h4 className="news-title"><button type="button" onClick={event => { event.stopPropagation(); onOpen(item) }}>{item.title}</button></h4>
         {item.tags.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1">
             {item.tags.map(tag => (
               <Tag
                 key={tag}
                 className="cursor-pointer"
+                role="button"
+                tabIndex={0}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onTagClick(tag)
+                  }
+                }}
                 onClick={e => {
                   e.stopPropagation()
                   onTagClick(tag)

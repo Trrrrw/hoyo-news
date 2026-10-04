@@ -2,8 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   IconArrowUp,
   IconBrandGithub,
-  IconChevronDown,
-  IconChevronUp,
+  IconAdjustments,
   IconLoader2,
   IconMoon,
   IconRefresh,
@@ -13,13 +12,15 @@ import {
 import {
   Alert,
   Button,
-  Card,
+  Drawer,
   Empty,
   FloatButton,
   Form,
   Input,
   Pagination,
   Select,
+  Segmented,
+  Tag,
   Spin,
   Tooltip,
 } from 'antd'
@@ -34,7 +35,7 @@ import {
 } from './api'
 import type { GameDataEntry, GameSummary, NewsItem, NewsSource, NewsTagGroup } from './api'
 import FilterPanel from './components/FilterPanel'
-import { UNTAGGED_TAG_VALUE } from './components/FilterPanel'
+import { DEFAULT_FILTER_VALUES, UNTAGGED_TAG_VALUE } from './components/FilterPanel'
 import type { FilterValues, TagOptionItem } from './components/FilterPanel'
 import NewsDrawer from './components/NewsDrawer'
 import NewsItemRow from './components/NewsItemRow'
@@ -50,6 +51,18 @@ function isAbortError(e: unknown): boolean {
 function toMessage(e: unknown): string {
   if (e instanceof Error) return e.message
   return '请求失败，请稍后重试'
+}
+
+// 同一页面会话复用已完成和进行中的请求，失败结果不缓存
+function cachedRequest<T>(cache: Map<string, Promise<T>>, key: string, request: () => Promise<T>): Promise<T> {
+  const existing = cache.get(key)
+  if (existing) return existing
+  const pending = request().catch(error => {
+    if (cache.get(key) === pending) cache.delete(key)
+    throw error
+  })
+  cache.set(key, pending)
+  return pending
 }
 
 function ThemeToggle() {
@@ -78,6 +91,7 @@ export default function App() {
   const [filterForm] = Form.useForm<FilterValues>()
   const copyText = useCopyText()
   const [initialRoute] = useState<NewsRouteState>(() => readNewsRoute())
+  const [appliedFilters, setAppliedFilters] = useState<Partial<FilterValues>>(initialRoute.values)
   const [keyword, setKeyword] = useState(() => initialRoute.values.q ?? '')
   const keywordRef = useRef(keyword)
   const filterFormRef = useRef(filterForm)
@@ -96,6 +110,10 @@ export default function App() {
   const [characters, setCharacters] = useState<GameDataEntry[]>([])
   const [loadingCharacters, setLoadingCharacters] = useState(false)
   const [filterCollapsed, setFilterCollapsed] = useState(true)
+  const [selectedCharacterNames, setSelectedCharacterNames] = useState<Record<string, string>>({})
+  const characterCache = useRef(new Map<string, Promise<GameDataEntry[]>>())
+  const tagCache = useRef(new Map<string, Promise<NewsTagGroup[]>>())
+  const [filterRevision, setFilterRevision] = useState(0)
 
   // 新闻详情抽屉
   const [drawerItem, setDrawerItem] = useState<NewsItem | null>(null)
@@ -115,7 +133,7 @@ export default function App() {
 
   const getCurrentFilterValues = useCallback(
     () => ({
-      ...filterFormRef.current.getFieldsValue(),
+      ...filterFormRef.current.getFieldsValue(true),
       q: keywordRef.current.trim() || undefined,
     }),
     [],
@@ -159,6 +177,7 @@ export default function App() {
         ? requestValues.during[1].format('YYYY-MM-DD')
         : undefined
 
+      setAppliedFilters(requestValues)
       try {
         const data = await fetchNews({
           game_id: opts.gameId,
@@ -211,22 +230,19 @@ export default function App() {
     return () => ctrl.abort()
   }, [initialRoute.gameId])
 
-  // 展开筛选条件 → 加载角色列表（角色数据接口目前仅部分游戏提供）
+  // 按游戏复用角色数据，关闭抽屉不取消正在进行的请求
   useEffect(() => {
     if (filterCollapsed || !gameId) return
-    const ctrl = new AbortController()
-    setCharacters([])
+    let active = true
     setLoadingCharacters(true)
-    fetchGameCharacters(gameId, ctrl.signal)
-      .then(items => setCharacters(items.filter(item => item.name)))
-      .catch(e => {
-        if (!isAbortError(e)) setCharacters([])
-      })
-      .finally(() => {
-        if (!ctrl.signal.aborted) setLoadingCharacters(false)
-      })
-    return () => ctrl.abort()
-  }, [filterCollapsed, gameId])
+    cachedRequest(characterCache.current, gameId, () =>
+      fetchGameCharacters(gameId).then(items => items.filter(item => item.name)),
+    )
+      .then(items => { if (active) setCharacters(items) })
+      .catch(e => { if (active) setError(toMessage(e)) })
+      .finally(() => { if (active) setLoadingCharacters(false) })
+    return () => { active = false; setLoadingCharacters(false) }
+  }, [filterCollapsed, gameId, filterRevision])
 
   // 游戏变化 → 加载来源列表
   useEffect(() => {
@@ -280,22 +296,20 @@ export default function App() {
     sourceId,
   ])
 
-  // 展开筛选条件 → 加载当前来源的标签
+  // 标签按游戏和来源隔离，重复打开复用请求结果
   useEffect(() => {
     if (filterCollapsed || !gameId || !sourceId) return
-    const ctrl = new AbortController()
-    setTagGroups([])
+    let active = true
     setLoadingTags(true)
-    fetchNewsTags(gameId, sourceId, ctrl.signal)
-      .then(d => setTagGroups(d.groups))
-      .catch(e => {
-        if (!isAbortError(e)) setTagGroups([])
-      })
-      .finally(() => {
-        if (!ctrl.signal.aborted) setLoadingTags(false)
-      })
-    return () => ctrl.abort()
-  }, [filterCollapsed, gameId, sourceId])
+    const key = JSON.stringify([gameId, sourceId])
+    cachedRequest(tagCache.current, key, () =>
+      fetchNewsTags(gameId, sourceId).then(data => data.groups),
+    )
+      .then(groups => { if (active) setTagGroups(groups) })
+      .catch(e => { if (active) setError(toMessage(e)) })
+      .finally(() => { if (active) setLoadingTags(false) })
+    return () => { active = false; setLoadingTags(false) }
+  }, [filterCollapsed, gameId, sourceId, filterRevision])
 
   const handleGameChange = (id: string) => {
     routeUserInteracted.current = true
@@ -310,6 +324,7 @@ export default function App() {
   const handleSourceChange = (id: string) => {
     routeUserInteracted.current = true
     setTagGroups([])
+    filterForm.setFieldsValue({ tags: undefined, untagged: false })
     setSourceId(id)
   }
 
@@ -342,7 +357,7 @@ export default function App() {
   }
 
   const handleReset = () => {
-    filterForm.resetFields()
+    filterForm.setFieldsValue(DEFAULT_FILTER_VALUES)
     handleKeywordChange('')
     if (gameId && sourceId) {
       refreshNews({ gameId, sourceId, page: 1, values: { limit: pageSize, q: undefined } })
@@ -378,25 +393,22 @@ export default function App() {
     if (!gameId || !sourceId) return
 
     setError(null)
-    const shouldRefreshTags = !filterCollapsed
-    if (shouldRefreshTags) setLoadingTags(true)
+    characterCache.current.delete(gameId)
+    tagCache.current.delete(JSON.stringify([gameId, sourceId]))
+    setFilterRevision(revision => revision + 1)
     try {
-      const [, tags, sourceCount] = await Promise.all([
+      const [, sourceCount] = await Promise.all([
         refreshNews({
           gameId,
           sourceId,
           page,
           values: { ...getCurrentFilterValues(), limit: pageSize },
         }),
-        shouldRefreshTags ? fetchNewsTags(gameId, sourceId) : Promise.resolve(null),
         fetchNewsTotal(gameId, sourceId),
       ])
-      if (tags) setTagGroups(tags.groups)
       setSourceTotal(sourceCount.total)
     } catch (e) {
       if (!isAbortError(e)) setError(toMessage(e))
-    } finally {
-      if (shouldRefreshTags) setLoadingTags(false)
     }
   }
 
@@ -424,6 +436,23 @@ export default function App() {
     void copyText(rssUrl, 'RSS 链接已复制')
   }
 
+  const applyFilters = (patch: Partial<FilterValues>) => {
+    const next = { ...DEFAULT_FILTER_VALUES, ...appliedFilters, ...patch, limit: pageSize }
+    filterForm.setFieldsValue({ ...next, tags: [...(next.tags ?? []), ...(next.untagged ? [UNTAGGED_TAG_VALUE] : [])] })
+    if ('q' in patch) handleKeywordChange(patch.q ?? '')
+    if (gameId && sourceId) refreshNews({ gameId, sourceId, page: 1, values: next })
+  }
+  const filterChips: { key: string; label: string; remove: Partial<FilterValues> }[] = []
+  if (appliedFilters.q) filterChips.push({ key: 'q', label: `搜索：${appliedFilters.q}`, remove: { q: undefined } })
+  for (const tag of appliedFilters.tags ?? []) filterChips.push({ key: `tag:${tag}`, label: tag, remove: { tags: appliedFilters.tags?.filter(value => value !== tag) } })
+  if (appliedFilters.untagged) filterChips.push({ key: 'untagged', label: '未分类', remove: { untagged: false } })
+  for (const id of appliedFilters.characters ?? []) filterChips.push({ key: `character:${id}`, label: `角色：${characters.find(item => item.id === id)?.name ?? selectedCharacterNames[`${gameId}:${id}`] ?? id}`, remove: { characters: appliedFilters.characters?.filter(value => value !== id) } })
+  if (appliedFilters.during?.[0] || appliedFilters.during?.[1]) filterChips.push({ key: 'during', label: `${appliedFilters.during[0]?.format('YYYY-MM-DD') ?? '不限'} 至 ${appliedFilters.during[1]?.format('YYYY-MM-DD') ?? '不限'}`, remove: { during: null } })
+  if (appliedFilters.news_type && appliedFilters.news_type !== 'all') filterChips.push({ key: 'type', label: appliedFilters.news_type === 'article' ? '文章' : '视频', remove: { news_type: 'all' } })
+  if (appliedFilters.reverse) filterChips.push({ key: 'order', label: '最早发布', remove: { reverse: false } })
+
+  const drawerIndex = drawerItem ? news.findIndex(item => item.id === drawerItem.id && item.source === drawerItem.source) : -1
+
   const game = games.find(g => g.id === gameId) ?? null
   const source = sources.find(s => s.id === sourceId) ?? null
 
@@ -444,8 +473,8 @@ export default function App() {
   }))
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
-      <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="news-app min-h-screen text-neutral-900 dark:text-neutral-100">
+      <header className="news-header">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4">
           <div className="flex min-w-0 items-center gap-3">
             <a href="/" aria-label="蒸汽鸟报首页" className="shrink-0">
@@ -488,11 +517,36 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-5">
-        <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <main className="news-main mx-auto max-w-6xl px-4">
+        <section className="news-searchbar" aria-label="搜索新闻">
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+          <Input.Search
+            allowClear
+            value={keyword}
+            placeholder="搜索新闻标题"
+            enterButton="搜索"
+            loading={loadingNews}
+            onChange={event => handleKeywordChange(event.target.value)}
+            onSearch={handleKeywordSearch}
+            aria-label="搜索新闻标题"
+          />
+            </div>
+            <Button icon={<IconAdjustments size={18} />} onClick={() => setFilterCollapsed(false)} aria-haspopup="dialog">筛选{filterChips.length ? ` (${filterChips.length})` : ''}</Button>
+          </div>
+        </section>
+        <Drawer title="筛选新闻" open={!filterCollapsed} onClose={() => setFilterCollapsed(true)}
+          size="min(720px, 100vw)" forceRender rootClassName="news-filter-drawer"
+          footer={<div className="flex items-center justify-between gap-3">
+            <Button onClick={handleReset}>清除全部条件</Button>
+            <Button type="primary" loading={loadingNews} onClick={() => setFilterCollapsed(true)}>{error ? '返回列表' : `查看 ${total.toLocaleString()} 条结果`}</Button>
+          </div>}
+        >
+          <p className="mb-4 text-sm text-neutral-500">选择后自动更新结果，可同时选择多个标签和角色</p>
+        <div className="mb-3 grid grid-cols-2 gap-3">
           <div>
             <div className="mb-1 text-sm text-neutral-600 dark:text-neutral-300">
-              游戏 <span className="text-red-500">*</span>
+              游戏
             </div>
             <div className="flex items-center gap-2">
               {game?.icon && (
@@ -504,6 +558,7 @@ export default function App() {
               )}
               <Select
                 className="min-w-0 flex-1"
+                aria-label="选择游戏"
                 placeholder="选择游戏"
                 value={gameId ?? undefined}
                 onChange={handleGameChange}
@@ -516,10 +571,11 @@ export default function App() {
           </div>
           <div>
             <div className="mb-1 text-sm text-neutral-600 dark:text-neutral-300">
-              新闻来源 <span className="text-red-500">*</span>
+              新闻来源
             </div>
             <Select
               className="w-full"
+              aria-label="选择新闻来源"
               placeholder={gameId ? '选择新闻来源' : '请先选择游戏'}
               value={sourceId ?? undefined}
               onChange={handleSourceChange}
@@ -530,72 +586,40 @@ export default function App() {
           </div>
         </div>
 
-        <div className="mb-3">
-          <Input.Search
-            allowClear
-            value={keyword}
-            placeholder="搜索新闻标题"
-            enterButton="搜索"
-            loading={loadingNews}
-            onChange={event => handleKeywordChange(event.target.value)}
-            onSearch={handleKeywordSearch}
-            aria-label="搜索新闻标题"
-          />
-          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-            搜索语法：空格表示 AND，<code>|</code> 表示 OR，<code>-</code> 排除关键词，
-            <code>"..."</code> 匹配短语
-          </p>
+        <div className="quick-filters">
+          <Segmented aria-label="新闻类型" value={appliedFilters.news_type ?? 'all'}
+            options={[{ label: '全部', value: 'all' }, { label: '文章', value: 'article' }, { label: '视频', value: 'video' }]}
+            onChange={value => applyFilters({ news_type: value as FilterValues['news_type'] })} />
+          <Select aria-label="排序方式" value={appliedFilters.reverse ? 'asc' : 'desc'}
+            options={[{ label: '最新发布', value: 'desc' }, { label: '最早发布', value: 'asc' }]}
+            onChange={value => applyFilters({ reverse: value === 'asc' })} />
         </div>
-
-        <Card
-          title={
-            <button
-              type="button"
-              className="flex w-full items-center justify-between gap-2 border-0 bg-transparent p-0 text-left font-semibold"
-              aria-controls="news-filter-panel"
-              aria-expanded={!filterCollapsed}
-              onClick={() => setFilterCollapsed(collapsed => !collapsed)}
-            >
-              <span>筛选条件</span>
-              {filterCollapsed ? (
-                <IconChevronDown size={16} aria-hidden />
-              ) : (
-                <IconChevronUp size={16} aria-hidden />
-              )}
-            </button>
-          }
-          styles={{ body: { padding: 0 } }}
-        >
-          <div
-            aria-hidden={filterCollapsed}
-            inert={filterCollapsed}
-            className={`grid motion-reduce:transition-none transition-[grid-template-rows] duration-200 ease-in-out ${
-              filterCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'
-            }`}
-          >
-            <div className="min-h-0 overflow-hidden">
-              <div id="news-filter-panel" className="px-6 py-6">
-                <FilterPanel
-                  form={filterForm}
-                  tagOptions={tagOptions}
-                  characterOptions={characterOptions}
-                  loadingTags={loadingTags}
-                  loadingCharacters={loadingCharacters}
-                  queryLoading={loadingNews}
-                  onQuery={handleQuery}
-                  onReset={handleReset}
-                  onRss={handleCopyRss}
-                />
-              </div>
-            </div>
+          <FilterPanel
+            form={filterForm}
+            tagOptions={tagOptions}
+            characterOptions={characterOptions}
+            loadingTags={loadingTags}
+            loadingCharacters={loadingCharacters}
+            onQuery={handleQuery}
+          />
+          {error && <Alert type="error" showIcon title={error} />}
+        </Drawer>
+        {filterChips.length > 0 && (
+          <div className="active-filters" aria-label="已应用的筛选条件">
+            <span>已筛选</span>
+            {filterChips.map(chip => <Tag key={chip.key} closable onClose={() => applyFilters(chip.remove)}>{chip.label}</Tag>)}
+            <Button type="link" size="small" onClick={handleReset}>清除全部</Button>
           </div>
-        </Card>
-
+        )}
+        <div className="feed-heading">
+          <h3>资讯一览 <span>{source?.name ?? '新闻'}</span></h3>
+          <div className="flex items-center gap-3"><span className="text-xs text-neutral-500" aria-live="polite">{loadingNews ? '正在加载…' : `共 ${total.toLocaleString()} 条结果`}</span><Button size="small" onClick={handleCopyRss} disabled={!sourceId}>复制 RSS</Button></div>
+        </div>
         {error && <Alert className="mt-4" type="error" showIcon title={error} />}
 
         <Spin spinning={loadingNews}>
           {news.length > 0 ? (
-            <div className="mt-2 divide-y divide-neutral-200 dark:divide-neutral-800">
+            <div className="news-feed">
               {news.map(item => (
                 <NewsItemRow
                   key={item.id}
@@ -611,7 +635,7 @@ export default function App() {
             <Empty
               className="mt-6"
               description={
-                sourceId ? '暂无符合条件的新闻，可调整筛选条件' : '请选择游戏与新闻来源'
+                sourceId ? <span>没有找到符合条件的新闻<Button type="link" onClick={handleReset}>清除筛选</Button></span> : '请选择游戏与新闻来源'
               }
             />
           )}
@@ -660,6 +684,13 @@ export default function App() {
       )}
 
       <NewsDrawer
+        onCharacterClick={(id, name) => {
+          setSelectedCharacterNames(current => ({ ...current, [`${gameId}:${id}`]: name }))
+          applyFilters({ characters: [...new Set([...(appliedFilters.characters ?? []), id])] })
+        }}
+        previous={drawerIndex > 0 ? news[drawerIndex - 1] : undefined}
+        next={drawerIndex >= 0 ? news[drawerIndex + 1] : undefined}
+        onNavigate={setDrawerItem}
         item={drawerItem}
         gameIcon={game?.icon ?? null}
         gameId={gameId}
