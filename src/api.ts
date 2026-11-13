@@ -14,6 +14,7 @@ export interface NewsCharacter {
 export type VideoPlayback = 'direct' | 'embed'
 
 export interface NewsItem {
+  game_id: string
   id: string
   source: string
   title: string
@@ -45,9 +46,9 @@ export interface NewsSource {
   index: number
 }
 
-export interface GameDataEntry {
+export interface GameCharacter {
   id: string
-  name: string | null
+  name: string
 }
 
 export interface NewsTag {
@@ -75,7 +76,7 @@ export interface NewsListPage {
   limit: number
   offset: number
   items: NewsItem[]
-  meta: { game_id: string; source: string }
+  meta: null
 }
 
 export interface NewsQuery {
@@ -119,14 +120,14 @@ export function fetchGames(signal?: AbortSignal) {
 
 export function fetchNewsSources(gameId: string, signal?: AbortSignal) {
   return request<{ total: number; items: NewsSource[] }>(
-    `/api/v1/games/${encodeURIComponent(gameId)}/news/sources`,
+    `/api/v1/news/sources?game=${encodeURIComponent(gameId)}`,
     signal,
   )
 }
 
 export function fetchNewsTags(gameId: string, sourceId: string, signal?: AbortSignal) {
   return request<NewsTagsList>(
-    `/api/v1/games/${encodeURIComponent(gameId)}/news/tags?source=${encodeURIComponent(sourceId)}`,
+    `/api/v1/news/tags?game=${encodeURIComponent(gameId)}&source=${encodeURIComponent(sourceId)}`,
     signal,
   )
 }
@@ -135,10 +136,10 @@ export function fetchNewsTags(gameId: string, sourceId: string, signal?: AbortSi
 export async function fetchGameCharacters(gameId: string, signal?: AbortSignal) {
   const pageSize = 100
   const path = (offset: number) =>
-    `/api/v1/games/${encodeURIComponent(gameId)}/data/character?limit=${pageSize}&offset=${offset}`
+    `/api/v1/games/${encodeURIComponent(gameId)}/characters?limit=${pageSize}&offset=${offset}`
   const first = await request<{
     total: number
-    items: GameDataEntry[]
+    items: GameCharacter[]
   }>(path(0), signal)
 
   if (first.items.length >= first.total) return first.items
@@ -146,7 +147,7 @@ export async function fetchGameCharacters(gameId: string, signal?: AbortSignal) 
   const pages = await Promise.all(
     Array.from(
       { length: Math.ceil((first.total - first.items.length) / pageSize) },
-      (_, index) => request<{ items: GameDataEntry[] }>(path((index + 1) * pageSize), signal),
+      (_, index) => request<{ items: GameCharacter[] }>(path((index + 1) * pageSize), signal),
     ),
   )
   return [first, ...pages].flatMap(page => page.items)
@@ -154,6 +155,7 @@ export async function fetchGameCharacters(gameId: string, signal?: AbortSignal) 
 
 export function fetchNews(query: NewsQuery, signal?: AbortSignal) {
   const params = new URLSearchParams()
+  params.set('game', query.game_id)
   params.set('source', query.source)
   if (query.q) params.set('q', query.q)
   for (const t of query.tag ?? []) params.append('tag', t)
@@ -166,7 +168,7 @@ export function fetchNews(query: NewsQuery, signal?: AbortSignal) {
   params.set('offset', String(query.offset))
   if (query.order) params.set('order', query.order)
   return request<NewsListPage>(
-    `/api/v1/games/${encodeURIComponent(query.game_id)}/news?${params.toString()}`,
+    `/api/v1/news?${params.toString()}`,
     signal,
   )
 }
@@ -174,7 +176,7 @@ export function fetchNews(query: NewsQuery, signal?: AbortSignal) {
 /** 获取指定游戏和来源下的新闻总数，不带其他筛选条件 */
 export function fetchNewsTotal(gameId: string, sourceId: string, signal?: AbortSignal) {
   return request<{ total: number }>(
-    `/api/v1/games/${encodeURIComponent(gameId)}/news?source=${encodeURIComponent(sourceId)}&limit=1&offset=0`,
+    `/api/v1/news?game=${encodeURIComponent(gameId)}&source=${encodeURIComponent(sourceId)}&limit=1&offset=0`,
     signal,
   )
 }
@@ -187,7 +189,7 @@ export function fetchNewsVideo(
   signal?: AbortSignal,
 ) {
   return request<{ video_url: string; video_playback?: VideoPlayback | null }>(
-    `/api/v1/games/${encodeURIComponent(gameId)}/news/${encodeURIComponent(newsId)}/media/video?source=${encodeURIComponent(source)}`,
+    `/api/v1/news/${encodeURIComponent(gameId)}/${encodeURIComponent(source)}/${encodeURIComponent(newsId)}/media/video`,
     signal,
   )
 }

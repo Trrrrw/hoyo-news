@@ -33,7 +33,7 @@ import {
   fetchNewsSources,
   fetchNewsTags,
 } from './api'
-import type { GameDataEntry, GameSummary, NewsItem, NewsSource, NewsTagGroup } from './api'
+import type { GameCharacter, GameSummary, NewsItem, NewsSource, NewsTagGroup } from './api'
 import FilterPanel from './components/FilterPanel'
 import { DEFAULT_FILTER_VALUES, UNTAGGED_TAG_VALUE } from './components/FilterPanel'
 import type { FilterValues, TagOptionItem } from './components/FilterPanel'
@@ -107,11 +107,11 @@ export default function App() {
   // 可选筛选相关的派生数据
   const [tagGroups, setTagGroups] = useState<NewsTagGroup[]>([])
   const [loadingTags, setLoadingTags] = useState(false)
-  const [characters, setCharacters] = useState<GameDataEntry[]>([])
+  const [characters, setCharacters] = useState<GameCharacter[]>([])
   const [loadingCharacters, setLoadingCharacters] = useState(false)
   const [filterCollapsed, setFilterCollapsed] = useState(true)
   const [selectedCharacterNames, setSelectedCharacterNames] = useState<Record<string, string>>({})
-  const characterCache = useRef(new Map<string, Promise<GameDataEntry[]>>())
+  const characterCache = useRef(new Map<string, Promise<GameCharacter[]>>())
   const tagCache = useRef(new Map<string, Promise<NewsTagGroup[]>>())
   const [filterRevision, setFilterRevision] = useState(0)
 
@@ -432,7 +432,7 @@ export default function App() {
     if (values.during?.[0]) params.set('published_from', values.during[0].format('YYYY-MM-DD'))
     if (values.during?.[1]) params.set('published_to', values.during[1].format('YYYY-MM-DD'))
 
-    const rssUrl = `${BASE_URL}/api/v1/games/${encodeURIComponent(gameId)}/news/rss?${params.toString()}`
+    const rssUrl = `${BASE_URL}/api/v1/news/rss?game=${encodeURIComponent(gameId)}&${params.toString()}`
     void copyText(rssUrl, 'RSS 链接已复制')
   }
 
