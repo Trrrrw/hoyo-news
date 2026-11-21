@@ -25,7 +25,7 @@ export interface NewsItem {
   title: string
   source_url: string
   cover: string | null
-  intro: string | null
+  intro?: string | null
   search_match?: {
     title?: NewsSearchPart[]
     body?: NewsSearchPart[]
@@ -34,8 +34,8 @@ export interface NewsItem {
   publish_time: string | null
   tags: string[]
   characters: NewsCharacter[]
-  video_url: string | null
-  video_playback: VideoPlayback | null
+  video_url?: string | null
+  video_playback?: VideoPlayback | null
   video_duration: number | null
 }
 
@@ -167,8 +167,9 @@ export function fetchNews(query: NewsQuery, signal?: AbortSignal) {
   const params = new URLSearchParams()
   params.set('game', query.game_id)
   params.set('source', query.source)
-  if (query.q) {
-    params.set('q', query.q)
+  const keyword = query.q?.trim()
+  if (keyword) {
+    params.set('q', keyword)
     if (query.search_body) params.set('search_body', 'true')
   }
   for (const t of query.tag ?? []) params.append('tag', t)
@@ -180,10 +181,8 @@ export function fetchNews(query: NewsQuery, signal?: AbortSignal) {
   params.set('limit', String(query.limit))
   params.set('offset', String(query.offset))
   if (query.order) params.set('order', query.order)
-  return request<NewsListPage>(
-    `/api/v1/news?${params.toString()}`,
-    signal,
-  )
+  const path = keyword ? '/api/v1/news/search' : '/api/v1/news'
+  return request<NewsListPage>(`${path}?${params.toString()}`, signal)
 }
 
 /** 获取指定游戏和来源下的新闻总数，不带其他筛选条件 */
@@ -195,6 +194,11 @@ export function fetchNewsTotal(gameId: string, sourceId: string, signal?: AbortS
 }
 
 /** 获取新闻视频播放信息（米游社等来源需要通过该接口获取有效地址） */
+export function fetchNewsDetail(item: Pick<NewsItem, 'game_id' | 'source' | 'id'>, signal?: AbortSignal) {
+  const path = [item.game_id, item.source, item.id].map(encodeURIComponent).join('/')
+  return request<NewsItem & { intro: string | null }>(`/api/v1/news/${path}`, signal)
+}
+
 export function fetchNewsVideo(
   gameId: string,
   source: string,

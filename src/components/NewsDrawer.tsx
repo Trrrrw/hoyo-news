@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Drawer, Spin, Tag } from 'antd'
-import { fetchNewsVideo } from '../api'
+import { fetchNewsDetail, fetchNewsVideo } from '../api'
 import type { NewsItem, VideoPlayback } from '../api'
 import { DirectVideoPlayer, YouTubeVideoPlayer } from './VideoPlayer'
 import { formatDuration, formatPublishTime } from '../utils'
@@ -100,6 +100,46 @@ function DrawerVideoPlayer({
   )
 }
 
+function ReaderBody({ item, intro }: { item: NewsItem; intro: string | null }) {
+  // 视频地址由播放接口获取，避免使用正文内过期的签名
+  const introHtml = intro?.replace(/<video[\s\S]*?<\/video>/gi, '') ?? ''
+  const showCover = item.cover && item.news_type !== 'video' && !/<img\b/i.test(introHtml)
+
+  return <>
+    {showCover && item.cover && <img src={item.cover} alt="" className="reader-cover" />}
+    {introHtml.trim() ? <div className="news-intro reader-content" dangerouslySetInnerHTML={{ __html: introHtml }} /> :
+      <div className="reader-empty">{item.news_type === 'video' ? '暂无文字介绍' : '暂无正文内容，可通过右上角查看原文'}</div>}
+  </>
+}
+
+function DeferredReaderBody({ item }: { item: NewsItem }) {
+  const [intro, setIntro] = useState<string | null>()
+  const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  const { game_id, source, id } = item
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchNewsDetail({ game_id, source, id }, controller.signal)
+      .then(detail => {
+        if (!controller.signal.aborted) setIntro(detail.intro)
+      })
+      .catch(error => {
+        if (!controller.signal.aborted) setError(error instanceof Error ? error.message : '请求失败')
+      })
+    return () => controller.abort()
+  }, [game_id, source, id, attempt])
+
+  if (error) {
+    return <div role="alert" className="reader-empty">
+      获取正文失败：{error}
+      <Button size="small" className="ml-2" onClick={() => { setError(null); setAttempt(value => value + 1) }}>重试</Button>
+    </div>
+  }
+  if (intro === undefined) return <div className="reader-empty" role="status"><Spin size="small" /> 正在加载正文…</div>
+  return <ReaderBody item={item} intro={intro} />
+}
+
 export default function NewsDrawer({
   item,
   gameIcon,
@@ -117,9 +157,6 @@ export default function NewsDrawer({
   const resetScroll = useCallback((element: HTMLElement | null) => {
     if (element) element.closest('.ant-drawer-body')?.scrollTo({ top: 0 })
   }, [])
-  // 视频地址单独获取，避免使用正文内过期的签名
-  const introHtml = item?.intro?.replace(/<video[\s\S]*?<\/video>/gi, '') ?? ''
-  const showCover = item?.cover && item.news_type !== 'video' && !/<img\b/i.test(introHtml)
 
   return (
     <Drawer
@@ -140,7 +177,7 @@ export default function NewsDrawer({
         <Button disabled={!next} onClick={() => next && onNavigate(next)} title={next?.title}>下一篇 →</Button>
       </div>}
     >
-      {item && <article key={`${source}:${item.id}`} className="reader-article" ref={resetScroll}>
+      {item && <article key={`${item.game_id}:${item.source}:${item.id}`} className="reader-article" ref={resetScroll}>
         <div className="reader-meta">
           {gameIcon && <img src={gameIcon} alt="" className="reader-game-icon" />}
           <span>{sourceName}</span>
@@ -150,10 +187,8 @@ export default function NewsDrawer({
           </Tag>
         </div>
         <h1 className="reader-title">{item.title}</h1>
-        {showCover && <img src={item.cover!} alt="" className="reader-cover" />}
         {item.news_type === 'video' && <DrawerVideoPlayer item={item} gameId={gameId} source={source} />}
-        {introHtml.trim() ? <div className="news-intro reader-content" dangerouslySetInnerHTML={{ __html: introHtml }} /> :
-          <div className="reader-empty">{item.news_type === 'video' ? '暂无文字介绍' : '暂无正文内容，可通过右上角查看原文'}</div>}
+        {item.intro === undefined ? <DeferredReaderBody item={item} /> : <ReaderBody item={item} intro={item.intro} />}
         {(item.tags.length > 0 || item.characters.length > 0) && <section className="reader-related" aria-label="关联信息">
           {item.tags.length > 0 && <div className="reader-tags" aria-label="标签">
             {item.tags.map(tag => <ReaderTag key={tag} onClick={() => { onTagClick(tag); onClose() }}>{tag}</ReaderTag>)}

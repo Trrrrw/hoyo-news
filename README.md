@@ -94,7 +94,9 @@ GET /api/v1/games
 GET /api/v1/games/{game_id}/news/sources
 GET /api/v1/games/{game_id}/news/tags?source={source}
 GET /api/v1/games/{game_id}/data/character?limit={limit}&offset={offset}
-GET /api/v1/games/{game_id}/news?source={source}&...
+GET /api/v1/news?game={game_id}&source={source}&...
+GET /api/v1/news/search?game={game_id}&source={source}&q={keyword}
+GET /api/v1/news/{game_id}/{source}/{news_id}
 GET /api/v1/games/{game_id}/news/{news_id}/video?source={source}
 GET /api/v1/games/{game_id}/news/rss?source={source}&...
 ```
