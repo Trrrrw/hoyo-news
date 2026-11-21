@@ -7,6 +7,7 @@ const { RangePicker } = DatePicker
 
 export interface FilterValues {
   q?: string
+  search_body?: boolean
   tags?: string[]
   characters?: string[]
   untagged?: boolean
@@ -18,6 +19,7 @@ export interface FilterValues {
 
 export const DEFAULT_FILTER_VALUES: FilterValues = {
   q: undefined,
+  search_body: false,
   tags: undefined,
   characters: undefined,
   untagged: false,

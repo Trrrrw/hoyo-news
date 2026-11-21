@@ -1,5 +1,5 @@
 import { Tag } from 'antd'
-import type { NewsItem } from '../api'
+import type { NewsItem, NewsSearchPart } from '../api'
 import { formatDuration, formatPublishTime, stripHtml } from '../utils'
 
 interface NewsItemRowProps {
@@ -10,9 +10,18 @@ interface NewsItemRowProps {
   onTagClick: (tag: string) => void
 }
 
+function SearchParts({ parts }: { parts: NewsSearchPart[] }) {
+  return parts.map(({ text, highlight }, index) => (
+    <span key={index}>{highlight
+      ? <mark className="rounded-sm bg-amber-100 font-semibold text-amber-950 dark:bg-amber-900 dark:text-amber-100">{text}</mark>
+      : text}</span>
+  ))
+}
+
 export default function NewsItemRow({ item, gameIcon, sourceName, onOpen, onTagClick }: NewsItemRowProps) {
   const coverSrc = item.cover ?? gameIcon
-  const intro = stripHtml(item.intro)
+  const match = item.search_match
+  const intro = match?.body ? null : stripHtml(item.intro)
 
   return (
     <article
@@ -41,7 +50,7 @@ export default function NewsItemRow({ item, gameIcon, sourceName, onOpen, onTagC
           <span className="text-xs text-neutral-400 dark:text-neutral-500">{sourceName}</span>
           <span className="text-xs text-neutral-400 dark:text-neutral-500">{formatPublishTime(item.publish_time)}</span>
         </div>
-        <h4 className="news-title"><button type="button" onClick={event => { event.stopPropagation(); onOpen(item) }}>{item.title}</button></h4>
+        <h4 className="news-title"><button type="button" onClick={event => { event.stopPropagation(); onOpen(item) }}>{match?.title ? <SearchParts parts={match.title} /> : item.title}</button></h4>
         {item.tags.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1">
             {item.tags.map(tag => (
@@ -72,7 +81,9 @@ export default function NewsItemRow({ item, gameIcon, sourceName, onOpen, onTagC
             关联角色：{item.characters.map(c => c.name).join(' / ')}
           </div>
         )}
-        {intro && <p className="mt-1.5 line-clamp-2 text-sm text-neutral-500 dark:text-neutral-400">{intro}</p>}
+        {match?.body
+          ? <p className="mt-1.5 break-words text-sm leading-relaxed text-neutral-600 dark:text-neutral-300"><SearchParts parts={match.body} /></p>
+          : intro && <p className="mt-1.5 line-clamp-2 text-sm text-neutral-500 dark:text-neutral-400">{intro}</p>}
       </div>
     </article>
   )

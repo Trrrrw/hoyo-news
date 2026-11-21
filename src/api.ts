@@ -13,6 +13,11 @@ export interface NewsCharacter {
 
 export type VideoPlayback = 'direct' | 'embed'
 
+export interface NewsSearchPart {
+  text: string
+  highlight: boolean
+}
+
 export interface NewsItem {
   game_id: string
   id: string
@@ -21,6 +26,10 @@ export interface NewsItem {
   source_url: string
   cover: string | null
   intro: string | null
+  search_match?: {
+    title?: NewsSearchPart[]
+    body?: NewsSearchPart[]
+  }
   news_type: 'article' | 'video'
   publish_time: string | null
   tags: string[]
@@ -83,6 +92,7 @@ export interface NewsQuery {
   game_id: string
   source: string
   q?: string
+  search_body?: boolean
   tag?: string[]
   untagged?: boolean
   character?: string[]
@@ -157,7 +167,10 @@ export function fetchNews(query: NewsQuery, signal?: AbortSignal) {
   const params = new URLSearchParams()
   params.set('game', query.game_id)
   params.set('source', query.source)
-  if (query.q) params.set('q', query.q)
+  if (query.q) {
+    params.set('q', query.q)
+    if (query.search_body) params.set('search_body', 'true')
+  }
   for (const t of query.tag ?? []) params.append('tag', t)
   if (query.untagged) params.set('untagged', 'true')
   for (const character of query.character ?? []) params.append('character', character)

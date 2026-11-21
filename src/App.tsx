@@ -183,6 +183,7 @@ export default function App() {
           game_id: opts.gameId,
           source: opts.sourceId,
           q: q || undefined,
+          search_body: requestValues.search_body,
           tag: requestValues.tags?.length ? requestValues.tags : undefined,
           untagged: requestValues.untagged || undefined,
           character: requestValues.characters?.length ? requestValues.characters : undefined,
@@ -356,6 +357,18 @@ export default function App() {
     }
   }
 
+  const handleBodySearchChange = (checked: boolean) => {
+    filterForm.setFieldsValue({ search_body: checked })
+    if (gameId && sourceId) {
+      refreshNews({
+        gameId,
+        sourceId,
+        page: 1,
+        values: { ...getCurrentFilterValues(), search_body: checked, limit: pageSize },
+      })
+    }
+  }
+
   const handleReset = () => {
     filterForm.setFieldsValue(DEFAULT_FILTER_VALUES)
     handleKeywordChange('')
@@ -421,7 +434,10 @@ export default function App() {
     params.set('limit', String(pageSize))
 
     const q = values.q?.trim()
-    if (q) params.set('q', q)
+    if (q) {
+      params.set('q', q)
+      if (values.search_body) params.set('search_body', 'true')
+    }
     for (const character of values.characters ?? []) params.append('character', character)
     const hasUntagged = Boolean(values.untagged || values.tags?.includes(UNTAGGED_TAG_VALUE))
     for (const tag of values.tags ?? []) {
@@ -451,6 +467,7 @@ export default function App() {
   if (appliedFilters.news_type && appliedFilters.news_type !== 'all') filterChips.push({ key: 'type', label: appliedFilters.news_type === 'article' ? '文章' : '视频', remove: { news_type: 'all' } })
   if (appliedFilters.reverse) filterChips.push({ key: 'order', label: '最早发布', remove: { reverse: false } })
 
+  const searchLabel = appliedFilters.search_body ? '搜索新闻标题和正文' : '搜索新闻标题'
   const drawerIndex = drawerItem ? news.findIndex(item => item.id === drawerItem.id && item.source === drawerItem.source) : -1
 
   const game = games.find(g => g.id === gameId) ?? null
@@ -521,19 +538,29 @@ export default function App() {
         <section className="news-searchbar" aria-label="搜索新闻">
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
-          <Input.Search
-            allowClear
-            value={keyword}
-            placeholder="搜索新闻标题"
-            enterButton="搜索"
-            loading={loadingNews}
-            onChange={event => handleKeywordChange(event.target.value)}
-            onSearch={handleKeywordSearch}
-            aria-label="搜索新闻标题"
-          />
+              <Input.Search
+                allowClear
+                value={keyword}
+                placeholder={searchLabel}
+                enterButton="搜索"
+                loading={loadingNews}
+                onChange={event => handleKeywordChange(event.target.value)}
+                onSearch={handleKeywordSearch}
+                aria-label={searchLabel}
+              />
             </div>
             <Button icon={<IconAdjustments size={18} />} onClick={() => setFilterCollapsed(false)} aria-haspopup="dialog">筛选{filterChips.length ? ` (${filterChips.length})` : ''}</Button>
           </div>
+          <label className="mt-2 inline-flex min-h-9 cursor-pointer items-center gap-2 text-sm text-[var(--ink)]">
+            <input
+              type="checkbox"
+              className="size-4 accent-[#347b98]"
+              checked={Boolean(appliedFilters.search_body)}
+              disabled={!gameId || !sourceId}
+              onChange={event => handleBodySearchChange(event.target.checked)}
+            />
+            搜索正文
+          </label>
         </section>
         <Drawer title="筛选新闻" open={!filterCollapsed} onClose={() => setFilterCollapsed(true)}
           size="min(720px, 100vw)" forceRender rootClassName="news-filter-drawer"

@@ -40,6 +40,7 @@ export function readNewsRoute(): NewsRouteState {
     page: Math.floor(offset / limit) + 1,
     values: {
       q: params.get('q') || undefined,
+      search_body: params.get('search_body') === 'true',
       tags: tags.length ? tags : undefined,
       characters: params.getAll('character').length ? params.getAll('character') : undefined,
       untagged,
@@ -63,6 +64,7 @@ export function writeNewsRoute(
 
   const q = values.q?.trim()
   if (q) params.set('q', q)
+  if (values.search_body) params.set('search_body', 'true')
   const hasUntagged = Boolean(values.untagged || values.tags?.includes(UNTAGGED_TAG_VALUE))
   for (const tag of values.tags ?? []) {
     if (tag !== UNTAGGED_TAG_VALUE) params.append('tag', tag)
