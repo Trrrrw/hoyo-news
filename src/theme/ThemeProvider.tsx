@@ -57,17 +57,12 @@ export default function ThemeProvider({ children }: { children: ReactNode }) {
         theme={{
           algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
           token: {
-            colorPrimary: isDark ? '#4ba0bf' : '#276d89',
-            borderRadius: 10,
+            colorPrimary: '#1677ff',
+            borderRadius: 8,
             controlHeight: 36,
             fontFamily:
               '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", system-ui, -apple-system, sans-serif',
-            colorBgContainer: isDark ? '#141d24' : '#ffffff',
-            colorBgElevated: isDark ? '#1a252e' : '#ffffff',
-            colorBorder: isDark ? '#283946' : '#d8e1e7',
-            colorBorderSecondary: isDark ? '#21303b' : '#e6edf1',
-            colorText: isDark ? '#e4edf2' : '#132632',
-            colorTextSecondary: isDark ? '#8fa5b2' : '#526572',
+            colorTextSecondary: isDark ? '#bfbfbf' : '#595959',
           },
         }}
       >

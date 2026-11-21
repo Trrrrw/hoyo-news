@@ -2,42 +2,40 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --bg-canvas: #f4f6f8;
+  --bg-canvas: #f5f5f5;
   --bg-surface: #ffffff;
-  --bg-subtle: #edf2f5;
-  --bg-hover: #f0f6f8;
-  --ink-primary: #132632;
-  --ink-secondary: #526572;
-  --ink-muted: #768894;
-  --border-subtle: #dde5ea;
-  --border-strong: #c7d4dc;
-  --accent-primary: #276d89;
-  --accent-primary-soft: rgba(39, 109, 137, 0.1);
-  --accent-brass: #9a8158;
-  --accent-video: #6d4ec4;
-  --accent-video-soft: rgba(109, 78, 196, 0.1);
-  --highlight-bg: #fef0c7;
-  --highlight-ink: #7a4100;
+  --bg-subtle: #f0f0f0;
+  --bg-hover: #fafafa;
+  --ink-primary: rgba(0, 0, 0, 0.88);
+  --ink-secondary: #595959;
+  --ink-muted: #8c8c8c;
+  --border-subtle: #e8e8e8;
+  --border-strong: #d9d9d9;
+  --accent-primary: #1677ff;
+  --accent-primary-soft: rgba(22, 119, 255, 0.09);
+  --accent-video: #722ed1;
+  --accent-video-soft: rgba(114, 46, 209, 0.09);
+  --highlight-bg: #fff1b8;
+  --highlight-ink: #873800;
   font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
 .dark {
-  --bg-canvas: #0d1318;
-  --bg-surface: #141d24;
-  --bg-subtle: #1b2730;
-  --bg-hover: #19252e;
-  --ink-primary: #e4edf2;
-  --ink-secondary: #98aebc;
-  --ink-muted: #728896;
-  --border-subtle: #23323d;
-  --border-strong: #324654;
-  --accent-primary: #4ba0bf;
-  --accent-primary-soft: rgba(75, 160, 191, 0.16);
-  --accent-brass: #c2aa7f;
-  --accent-video: #b299ff;
-  --accent-video-soft: rgba(178, 153, 255, 0.16);
-  --highlight-bg: rgba(245, 158, 11, 0.28);
-  --highlight-ink: #fde68a;
+  --bg-canvas: #0f0f0f;
+  --bg-surface: #141414;
+  --bg-subtle: #1f1f1f;
+  --bg-hover: #1c1c1c;
+  --ink-primary: rgba(255, 255, 255, 0.88);
+  --ink-secondary: #bfbfbf;
+  --ink-muted: #8c8c8c;
+  --border-subtle: #262626;
+  --border-strong: #3a3a3a;
+  --accent-primary: #3c89e8;
+  --accent-primary-soft: rgba(60, 137, 232, 0.16);
+  --accent-video: #b37feb;
+  --accent-video-soft: rgba(179, 127, 235, 0.16);
+  --highlight-bg: rgba(250, 173, 20, 0.28);
+  --highlight-ink: #ffe58f;
 }
 
 body {
@@ -57,7 +55,6 @@ body {
 /* 顶部报头 */
 .news-header {
   background: var(--bg-surface);
-  border-top: 3px solid var(--accent-brass);
   border-bottom: 1px solid var(--border-subtle);
 }
 

@@ -346,7 +346,7 @@ export default function NewsModal({
                   {item.characters.map(character => (
                     <ReaderTag
                       key={character.id}
-                      color="cyan"
+                      color="blue"
                       onClick={() => {
                         onCharacterClick(character.id, character.name)
                         onClose()
