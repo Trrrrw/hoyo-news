@@ -1,16 +1,18 @@
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
-import { UNTAGGED_TAG_VALUE } from './components/FilterPanel'
-import type { FilterValues } from './components/FilterPanel'
+import { DEFAULT_PAGE_SIZE, normalizeFilters } from './filters'
+import type { FilterValues } from './filters'
 
 export interface NewsRouteState {
   gameId: string | null
   sourceId: string | null
   page: number
-  values: Partial<FilterValues>
+  limit: number
+  filters: FilterValues
 }
 
 function parseInteger(value: string | null, fallback: number, minimum: number) {
+  if (value == null || value.trim() === '') return fallback
   const parsed = Number(value)
   return Number.isInteger(parsed) && parsed >= minimum ? parsed : fallback
 }
@@ -21,62 +23,81 @@ function parseDate(value: string | null): Dayjs | null {
   return parsed.isValid() ? parsed : null
 }
 
+function safeDecodeURIComponent(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
 export function readNewsRoute(): NewsRouteState {
   const params = new URLSearchParams(window.location.search)
   const pathParts = window.location.pathname.split('/').filter(Boolean)
-  const limit = parseInteger(params.get('limit'), 20, 1)
+  const limit = Math.min(100, parseInteger(params.get('limit'), DEFAULT_PAGE_SIZE, 1))
   const offset = parseInteger(params.get('offset'), 0, 0)
   const newsType = params.get('news_type')
   const publishedFrom = parseDate(params.get('published_from'))
   const publishedTo = parseDate(params.get('published_to'))
   const hasDateRange = publishedFrom != null || publishedTo != null
-  const untagged = params.get('untagged') === 'true'
-  const routeTags = params.getAll('tag')
-  const tags = untagged ? [...routeTags, UNTAGGED_TAG_VALUE] : routeTags
 
   return {
-    gameId: pathParts[0] ? decodeURIComponent(pathParts[0]) : null,
+    gameId: pathParts[0] ? safeDecodeURIComponent(pathParts[0]) : null,
     sourceId: params.get('source'),
     page: Math.floor(offset / limit) + 1,
-    values: {
+    limit,
+    filters: normalizeFilters({
       q: params.get('q') || undefined,
       search_body: params.get('search_body') === 'true',
-      tags: tags.length ? tags : undefined,
-      characters: params.getAll('character').length ? params.getAll('character') : undefined,
-      untagged,
+      tags: params.getAll('tag'),
+      characters: params.getAll('character'),
+      untagged: params.get('untagged') === 'true',
       news_type: newsType === 'article' || newsType === 'video' ? newsType : 'all',
       during: hasDateRange ? [publishedFrom, publishedTo] : null,
-      limit,
       reverse: params.get('order') === 'asc',
-    },
+    }),
   }
+}
+
+export function buildNewsRouteUrl(
+  gameId: string,
+  sourceId: string,
+  filters: FilterValues,
+  page: number,
+  limit: number,
+): string {
+  const params = new URLSearchParams()
+  params.set('source', sourceId)
+
+  if (filters.q) params.set('q', filters.q)
+  if (filters.search_body) params.set('search_body', 'true')
+  for (const tag of filters.tags) params.append('tag', tag)
+  for (const character of filters.characters) params.append('character', character)
+  if (filters.untagged) params.set('untagged', 'true')
+  if (filters.news_type !== 'all') params.set('news_type', filters.news_type)
+  if (filters.during?.[0]) params.set('published_from', filters.during[0].format('YYYY-MM-DD'))
+  if (filters.during?.[1]) params.set('published_to', filters.during[1].format('YYYY-MM-DD'))
+  params.set('limit', String(limit))
+  params.set('offset', String(Math.max(0, (page - 1) * limit)))
+  params.set('order', filters.reverse ? 'asc' : 'desc')
+
+  return `/${encodeURIComponent(gameId)}?${params.toString()}`
 }
 
 export function writeNewsRoute(
   gameId: string,
   sourceId: string,
-  values: FilterValues,
+  filters: FilterValues,
   page: number,
   limit: number,
+  mode: 'replace' | 'push' = 'replace',
 ) {
-  const params = new URLSearchParams()
-  params.set('source', sourceId)
-
-  const q = values.q?.trim()
-  if (q) params.set('q', q)
-  if (values.search_body) params.set('search_body', 'true')
-  const hasUntagged = Boolean(values.untagged || values.tags?.includes(UNTAGGED_TAG_VALUE))
-  for (const tag of values.tags ?? []) {
-    if (tag !== UNTAGGED_TAG_VALUE) params.append('tag', tag)
+  const nextUrl = buildNewsRouteUrl(gameId, sourceId, filters, page, limit)
+  const currentUrl = `${window.location.pathname}${window.location.search}`
+  if (nextUrl === currentUrl) return
+  if (mode === 'push') {
+    window.history.pushState(null, '', nextUrl)
+  } else {
+    window.history.replaceState(null, '', nextUrl)
   }
-  for (const character of values.characters ?? []) params.append('character', character)
-  if (hasUntagged) params.set('untagged', 'true')
-  if (values.news_type !== 'all') params.set('news_type', values.news_type)
-  if (values.during?.[0]) params.set('published_from', values.during[0].format('YYYY-MM-DD'))
-  if (values.during?.[1]) params.set('published_to', values.during[1].format('YYYY-MM-DD'))
-  params.set('limit', String(limit))
-  params.set('offset', String(Math.max(0, (page - 1) * limit)))
-  params.set('order', values.reverse ? 'asc' : 'desc')
-
-  window.history.replaceState(null, '', `/${encodeURIComponent(gameId)}?${params.toString()}`)
 }

@@ -1,3 +1,4 @@
+import { IconPlayerPlayFilled, IconUser } from '@tabler/icons-react'
 import { Tag } from 'antd'
 import type { NewsItem, NewsSearchPart } from '../api'
 import { formatDuration, formatPublishTime, stripHtml } from '../utils'
@@ -8,55 +9,92 @@ interface NewsItemRowProps {
   sourceName: string
   onOpen: (item: NewsItem) => void
   onTagClick: (tag: string) => void
+  onCharacterClick: (id: string, name: string) => void
 }
 
 function SearchParts({ parts }: { parts: NewsSearchPart[] }) {
   return parts.map(({ text, highlight }, index) => (
-    <span key={index}>{highlight
-      ? <mark className="rounded-sm bg-amber-100 font-semibold text-amber-950 dark:bg-amber-900 dark:text-amber-100">{text}</mark>
-      : text}</span>
+    <span key={index}>
+      {highlight ? <mark className="search-highlight">{text}</mark> : text}
+    </span>
   ))
 }
 
-export default function NewsItemRow({ item, gameIcon, sourceName, onOpen, onTagClick }: NewsItemRowProps) {
+export default function NewsItemRow({
+  item,
+  gameIcon,
+  sourceName,
+  onOpen,
+  onTagClick,
+  onCharacterClick,
+}: NewsItemRowProps) {
   const coverSrc = item.cover ?? gameIcon
+  const isVideo = item.news_type === 'video'
+  const durationText = isVideo ? formatDuration(item.video_duration) : ''
   const match = item.search_match
   const intro = match?.body ? null : stripHtml(item.intro)
 
   return (
-    <article
-      className="news-row"
-      onClick={() => onOpen(item)}
-    >
-      {coverSrc ? (
-        <img
-          src={coverSrc}
-          alt={item.title}
-          loading="lazy"
-          className="news-cover"
-        />
-      ) : (
-        <div className="flex aspect-video h-auto w-full shrink-0 items-center justify-center rounded-lg bg-neutral-200 text-xs text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400 sm:aspect-auto sm:h-28 sm:w-44">
-          无封面
+    <article className="news-row" onClick={() => onOpen(item)}>
+      <div className="news-thumb">
+        {coverSrc ? (
+          <img
+            src={coverSrc}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="news-cover"
+          />
+        ) : (
+          <div className="news-cover news-cover-empty" aria-hidden="true">
+            无封面
+          </div>
+        )}
+        {isVideo && (
+          <span className="news-video-badge tabular-nums" aria-label={durationText ? `视频时长 ${durationText}` : '视频'}>
+            <IconPlayerPlayFilled size={10} aria-hidden="true" />
+            {durationText && <span>{durationText}</span>}
+          </span>
+        )}
+      </div>
+
+      <div className="news-body">
+        <div className="news-meta">
+          <span className={isVideo ? 'news-type-pill is-video' : 'news-type-pill'}>
+            {isVideo ? '视频' : '文章'}
+          </span>
+          <time className="news-time tabular-nums" dateTime={item.publish_time ?? undefined}>
+            {formatPublishTime(item.publish_time)}
+          </time>
+          <span className="news-source">{sourceName}</span>
         </div>
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <Tag color={item.news_type === 'video' ? 'purple' : 'blue'}>
-            {item.news_type === 'video'
-              ? `视频${item.video_duration != null ? ` · ${formatDuration(item.video_duration)}` : ''}`
-              : '文章'}
-          </Tag>
-          <span className="text-xs text-neutral-400 dark:text-neutral-500">{sourceName}</span>
-          <span className="text-xs text-neutral-400 dark:text-neutral-500">{formatPublishTime(item.publish_time)}</span>
-        </div>
-        <h4 className="news-title"><button type="button" onClick={event => { event.stopPropagation(); onOpen(item) }}>{match?.title ? <SearchParts parts={match.title} /> : item.title}</button></h4>
-        {item.tags.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1">
+
+        <h3 className="news-title">
+          <button
+            type="button"
+            onClick={event => {
+              event.stopPropagation()
+              onOpen(item)
+            }}
+          >
+            {match?.title ? <SearchParts parts={match.title} /> : item.title}
+          </button>
+        </h3>
+
+        {match?.body ? (
+          <p className="news-match-snippet">
+            <SearchParts parts={match.body} />
+          </p>
+        ) : (
+          intro && <p className="news-excerpt">{intro}</p>
+        )}
+
+        {(item.tags.length > 0 || item.characters.length > 0) && (
+          <div className="news-foot">
             {item.tags.map(tag => (
               <Tag
                 key={tag}
-                className="cursor-pointer"
+                className="news-tag"
                 role="button"
                 tabIndex={0}
                 onKeyDown={event => {
@@ -66,24 +104,34 @@ export default function NewsItemRow({ item, gameIcon, sourceName, onOpen, onTagC
                     onTagClick(tag)
                   }
                 }}
-                onClick={e => {
-                  e.stopPropagation()
+                onClick={event => {
+                  event.stopPropagation()
                   onTagClick(tag)
                 }}
               >
                 {tag}
               </Tag>
             ))}
+            {item.characters.length > 0 && (
+              <div className="news-characters" aria-label="关联角色">
+                <IconUser size={13} className="shrink-0" aria-hidden="true" />
+                {item.characters.map(character => (
+                  <button
+                    key={character.id}
+                    type="button"
+                    className="news-character-btn"
+                    onClick={event => {
+                      event.stopPropagation()
+                      onCharacterClick(character.id, character.name)
+                    }}
+                  >
+                    {character.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
-        {item.characters.length > 0 && (
-          <div className="mt-1.5 text-xs text-neutral-400 dark:text-neutral-500">
-            关联角色：{item.characters.map(c => c.name).join(' / ')}
-          </div>
-        )}
-        {match?.body
-          ? <p className="mt-1.5 break-words text-sm leading-relaxed text-neutral-600 dark:text-neutral-300"><SearchParts parts={match.body} /></p>
-          : intro && <p className="mt-1.5 line-clamp-2 text-sm text-neutral-500 dark:text-neutral-400">{intro}</p>}
       </div>
     </article>
   )

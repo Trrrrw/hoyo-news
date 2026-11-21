@@ -81,9 +81,9 @@ https://akasha.trrw.cn
 | `offset` | 分页偏移量 |
 | `order` | `asc` 或 `desc` |
 
-点击搜索框旁的“筛选”打开抽屉，标签和角色以多选按钮展示，选择后自动查询。选项在页面会话内缓存，手动刷新会使当前选项缓存失效。选择“未分类”标签时，前端会将其转换为 API 参数 `untagged=true`
+顶部导航栏可直接切换游戏与新闻来源；工具栏支持关键词检索、切换“含正文”搜索、按类型与时间排序，并可打开筛选抽屉按发布日期、标签、未分类和角色进一步筛选。标签与角色选项在页面会话内缓存，手动刷新会使当前缓存失效。选择“未分类”标签时，前端会将其转换为 API 参数 `untagged=true`。
 
-勾选搜索框下方的“搜索正文”会同时搜索标题和正文，并高亮结果中的匹配词。分享页面网址可保留该设置
+开启搜索栏中的“含正文”会同时搜索标题和正文，并在列表（包括移动端）高亮结果中的匹配词。分享页面网址可保留该设置。
 
 ## API 接口
 
@@ -91,14 +91,14 @@ https://akasha.trrw.cn
 
 ```text
 GET /api/v1/games
-GET /api/v1/games/{game_id}/news/sources
-GET /api/v1/games/{game_id}/news/tags?source={source}
-GET /api/v1/games/{game_id}/data/character?limit={limit}&offset={offset}
+GET /api/v1/news/sources?game={game_id}
+GET /api/v1/news/tags?game={game_id}&source={source}
+GET /api/v1/games/{game_id}/characters?limit={limit}&offset={offset}
 GET /api/v1/news?game={game_id}&source={source}&...
 GET /api/v1/news/search?game={game_id}&source={source}&q={keyword}
 GET /api/v1/news/{game_id}/{source}/{news_id}
-GET /api/v1/games/{game_id}/news/{news_id}/video?source={source}
-GET /api/v1/games/{game_id}/news/rss?source={source}&...
+GET /api/v1/news/{game_id}/{source}/{news_id}/media/video
+GET /api/v1/news/rss?game={game_id}&source={source}&...
 ```
 
 完整的接口定义和响应结构请参考 [Akasha API 文档](https://akasha.trrw.cn/scalar)
@@ -129,18 +129,28 @@ public/
 └── steambird-mark.png
 
 src/
-├── api.ts                    API 请求、响应类型和数据模型
-├── App.tsx                   页面布局、数据加载和路由状态同步
+├── api.ts                        API 请求、响应类型和数据模型
+├── App.tsx                       页面布局与主交互编排
+├── filters.ts                    筛选模型、归一化与 RSS 地址生成
 ├── components/
-│   ├── FilterPanel.tsx       筛选条件和 RSS 链接复制
-│   ├── NewsDrawer.tsx        新闻详情抽屉和视频播放
-│   └── NewsItemRow.tsx       新闻列表项
+│   ├── AppHeader.tsx             顶部报头与主题切换
+│   ├── FilterPanel.tsx           高级筛选抽屉（日期、标签、角色）
+│   ├── GameSourceNav.tsx         游戏与新闻来源导航条
+│   ├── NewsDrawer.tsx            新闻详情抽屉、正文清理与视频播放
+│   ├── NewsFeedSkeleton.tsx      新闻列表加载骨架屏
+│   ├── NewsItemRow.tsx           新闻列表项与高亮片段展示
+│   ├── SearchToolbar.tsx         搜索栏、快捷筛选与已选条件标签
+│   └── VideoPlayer.tsx           直链与 YouTube 嵌入视频播放器
 ├── hooks/
-│   └── useCopyText.ts        复制文本和消息提示
-├── index.css                 全局样式和响应式样式
-├── main.tsx                  React 入口和 Ant Design 配置
-├── newsRoute.ts              URL 查询参数读写
-└── utils.ts                  正文、时间和时长格式化
+│   ├── useCopyText.ts            复制文本和消息提示
+│   └── useNewsFeed.ts            新闻数据、筛选状态、缓存与路由同步
+├── theme/
+│   ├── ThemeContext.ts           主题上下文定义
+│   └── ThemeProvider.tsx         浅色/深色主题与 Ant Design 配置
+├── index.css                     设计变量、全局样式和响应式样式
+├── main.tsx                      React 入口
+├── newsRoute.ts                  URL 查询参数读写
+└── utils.ts                      正文清理、时间和时长格式化
 ```
 
 ## 内容与版权声明

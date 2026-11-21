@@ -47,19 +47,27 @@ export default function ThemeProvider({ children }: { children: ReactNode }) {
     [mode, resolvedTheme, cycleTheme],
   )
 
+  const isDark = resolvedTheme === 'dark'
+
   return (
     <ThemeContext.Provider value={value}>
       <ConfigProvider
         locale={zhCN}
+        button={{ autoInsertSpace: false }}
         theme={{
-          algorithm:
-            resolvedTheme === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+          algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
           token: {
-            colorPrimary: '#347b98',
+            colorPrimary: isDark ? '#4ba0bf' : '#276d89',
             borderRadius: 10,
-            controlHeight: 38,
-            fontFamily: 'system-ui, -apple-system, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif',
-            colorTextSecondary: resolvedTheme === 'dark' ? '#bfbfbf' : '#595959',
+            controlHeight: 36,
+            fontFamily:
+              '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", system-ui, -apple-system, sans-serif',
+            colorBgContainer: isDark ? '#141d24' : '#ffffff',
+            colorBgElevated: isDark ? '#1a252e' : '#ffffff',
+            colorBorder: isDark ? '#283946' : '#d8e1e7',
+            colorBorderSecondary: isDark ? '#21303b' : '#e6edf1',
+            colorText: isDark ? '#e4edf2' : '#132632',
+            colorTextSecondary: isDark ? '#8fa5b2' : '#526572',
           },
         }}
       >
