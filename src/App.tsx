@@ -6,9 +6,9 @@ import type { NewsItem } from './api'
 import AppHeader from './components/AppHeader'
 import FilterPanel from './components/FilterPanel'
 import GameSourceNav from './components/GameSourceNav'
-import NewsDrawer from './components/NewsDrawer'
 import NewsFeedSkeleton from './components/NewsFeedSkeleton'
 import NewsItemRow from './components/NewsItemRow'
+import NewsModal from './components/NewsModal'
 import SearchToolbar from './components/SearchToolbar'
 import { UNTAGGED_TAG_VALUE, buildRssUrl, hasActiveFilters } from './filters'
 import type { TagOptionItem } from './filters'
@@ -222,7 +222,7 @@ export default function App() {
         onResetFilters={feed.resetFilters}
       />
 
-      <NewsDrawer
+      <NewsModal
         item={drawerItem}
         gameIcon={feed.game?.icon ?? null}
         gameId={feed.gameId}

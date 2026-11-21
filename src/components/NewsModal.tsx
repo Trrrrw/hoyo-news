@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { IconArrowLeft, IconArrowRight, IconCopy, IconExternalLink } from '@tabler/icons-react'
-import { Button, Drawer, Spin, Tag } from 'antd'
+import { Button, Modal, Spin, Tag } from 'antd'
 import { fetchNewsDetail, fetchNewsVideo } from '../api'
 import type { NewsItem, VideoPlayback } from '../api'
 import { useCopyText } from '../hooks/useCopyText'
@@ -30,7 +30,7 @@ function ReaderTag({ children, color, onClick }: { children: string; color?: str
   )
 }
 
-interface NewsDrawerProps {
+interface NewsModalProps {
   item: NewsItem | null
   gameIcon: string | null
   gameId: string | null
@@ -51,10 +51,10 @@ interface VideoLoadState {
 }
 
 /**
- * 抽屉内的视频播放器。
+ * 弹窗内的视频播放器。
  * 播放地址统一通过 /news/{game_id}/{source}/{id}/media/video 后端接口获取
  */
-function DrawerVideoPlayer({
+function ModalVideoPlayer({
   item,
   gameId,
   source,
@@ -193,7 +193,7 @@ function DeferredReaderBody({ item }: { item: NewsItem }) {
   return <ReaderBody item={item} intro={current.intro} />
 }
 
-export default function NewsDrawer({
+export default function NewsModal({
   item,
   gameIcon,
   gameId,
@@ -205,13 +205,13 @@ export default function NewsDrawer({
   previous,
   next,
   onNavigate,
-}: NewsDrawerProps) {
+}: NewsModalProps) {
   const copyText = useCopyText()
   const resetScroll = useCallback((element: HTMLElement | null) => {
-    if (element) element.closest('.ant-drawer-body')?.scrollTo({ top: 0 })
+    if (element) element.closest('.ant-modal-body')?.scrollTo({ top: 0 })
   }, [])
 
-  // 打开抽屉时支持左右方向键切换上一篇/下一篇
+  // 打开弹窗时支持左右方向键切换上一篇/下一篇
   useEffect(() => {
     if (!item) return
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -238,35 +238,48 @@ export default function NewsDrawer({
   }, [item, previous, next, onNavigate])
 
   return (
-    <Drawer
+    <Modal
       open={item != null}
-      onClose={onClose}
-      title="新闻详情"
-      size="min(820px, 100vw)"
-      rootClassName="news-reader"
+      onCancel={onClose}
+      centered
       destroyOnHidden
-      placement="right"
-      extra={
+      width="min(860px, calc(100vw - 32px))"
+      rootClassName="news-reader-modal"
+      title={
         item && (
-          <div className="flex items-center gap-1.5">
-            <Button
-              type="text"
-              size="small"
-              icon={<IconCopy size={15} />}
-              onClick={() => void copyText(item.source_url, '原文链接已复制')}
-            >
-              <span className="hidden sm:inline">复制链接</span>
-            </Button>
-            <Button
-              size="small"
-              icon={<IconExternalLink size={15} />}
-              iconPlacement="end"
-              href={item.source_url}
-              target="_blank"
-              rel="noreferrer"
-            >
-              查看原文
-            </Button>
+          <div className="reader-modal-header">
+            <div className="reader-meta">
+              {gameIcon && <img src={gameIcon} alt="" className="reader-game-icon" />}
+              <span>{sourceName}</span>
+              <time className="tabular-nums" dateTime={item.publish_time ?? undefined}>
+                {formatPublishTime(item.publish_time)}
+              </time>
+              <span className={item.news_type === 'video' ? 'news-type-pill is-video' : 'news-type-pill'}>
+                {item.news_type === 'video'
+                  ? `视频${item.video_duration != null ? ` ${formatDuration(item.video_duration)}` : ''}`
+                  : '文章'}
+              </span>
+            </div>
+            <div className="reader-header-actions">
+              <Button
+                type="text"
+                size="small"
+                icon={<IconCopy size={15} />}
+                onClick={() => void copyText(item.source_url, '原文链接已复制')}
+              >
+                <span className="hidden sm:inline">复制链接</span>
+              </Button>
+              <Button
+                size="small"
+                icon={<IconExternalLink size={15} />}
+                iconPlacement="end"
+                href={item.source_url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                查看原文
+              </Button>
+            </div>
           </div>
         )
       }
@@ -297,24 +310,11 @@ export default function NewsDrawer({
     >
       {item && (
         <article key={`${item.game_id}:${item.source}:${item.id}`} className="reader-article" ref={resetScroll}>
-          <div className="reader-meta">
-            {gameIcon && <img src={gameIcon} alt="" className="reader-game-icon" />}
-            <span>{sourceName}</span>
-            <time className="tabular-nums" dateTime={item.publish_time ?? undefined}>
-              {formatPublishTime(item.publish_time)}
-            </time>
-            <span className={item.news_type === 'video' ? 'news-type-pill is-video' : 'news-type-pill'}>
-              {item.news_type === 'video'
-                ? `视频${item.video_duration != null ? ` ${formatDuration(item.video_duration)}` : ''}`
-                : '文章'}
-            </span>
-          </div>
-
           <h2 className="reader-title">{item.title}</h2>
 
           {item.news_type === 'video' && (
             <div className="mb-5">
-              <DrawerVideoPlayer item={item} gameId={gameId} source={source} />
+              <ModalVideoPlayer item={item} gameId={gameId} source={source} />
             </div>
           )}
 
@@ -363,6 +363,6 @@ export default function NewsDrawer({
           <div className="reader-id tabular-nums">ID: {item.id}</div>
         </article>
       )}
-    </Drawer>
+    </Modal>
   )
 }
